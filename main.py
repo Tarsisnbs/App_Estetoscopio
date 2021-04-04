@@ -13,7 +13,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.ticker as ticker
 import numpy as np
-
+from PyQt5.QtCore import pyqtSlot
 from matplotlib.animation import FuncAnimation
 from PyQt5 import QtCore, QtWidgets,QtGui
 from PyQt5 import uic
@@ -43,44 +43,77 @@ class PloterMpl(QtWidgets.QMainWindow):
     WIDTH = 2
     CHANNELS = 1
     RATE = 8000
-
     def __init__(self):
+        self.interval = 30
         self.time_interval = 20
+
+        #define new Qthread
+        self.threadpool = QtCore.QThreadPool()	
+        self.threadpool.setMaxThreadCount(1)
+
         self.q = queue.Queue()
         self.canvas = MplCanvas(self, width=5, height=4, dpi=50)
+        
         QtWidgets.QMainWindow.__init__(self)
         self.resize(1024, 600)
+        
         self.ui = uic.loadUi('main.ui', self)
         self.ui.gridLayout_3.addWidget(self.canvas, 0, 1, 2, 1)
-       
-        print("objeto Ploter instanciado : area de plot criada")
-        self.pushButton.clicked.connect(self.start_audio)
-        self.pushButton_2.clicked.connect(self.stop_stream)
         
-    
-    def start_audio(self):
-        #inicialização pyaudio
-        self.pushButton.setEnabled(False)
-        #self.ani  = FuncAnimation(self.fig, self.update_plt_list, interval=self.time_interval,blit=True, frames = 500)
+
         self.p = pyaudio.PyAudio()
+        print("objeto instanciado: p -> Pyaudio()")
         
-        def callback(in_data, frame_count, time_info, status):
-            self.put_list((np.frombuffer(in_data, dtype=np.int16)))
-            return (in_data, pyaudio.paContinue)
-
-        self.stream = self.p.open(format=self.p.get_format_from_width(self.WIDTH),
-                    channels=self.CHANNELS,
-                    rate=self.RATE,
-                    input=True,
-                    output=True,
-                    frames_per_buffer = 1000,
-                    stream_callback=callback)
-        self.stream.start_stream()
-        while self.stream.is_active():
-                self.update_plt_list()
-
-        
+        self.pushButton.clicked.connect(self.start_worker)
+        self.pushButton_2.clicked.connect(self.stop_stream)
+        self.worker = None
+        print('Setup ok')
     
+    def start_worker(self):
+        # disable all user imputs
+        #clear axes plot
+
+        #self.canvas.axes.clear()
+        #self.go_on = False
+
+        #set thread with start_audio()
+        self.worker = Worker(self.start_audio, )
+        self.threadpool.start(self.worker)	
+        
+        #self.reference_plot = None
+        #self.timer.setInterval(self.interval) 
+
+    def new_method(self):
+         self.lineEdit.setEnabled(False)#msec
+
+    def start_audio(self):
+        try:
+            #process all events
+            QtWidgets.QApplication.processEvents()
+
+            #define callback and stream
+            def callback(in_data, frame_count, time_info, status):
+                self.put_list((np.frombuffer(in_data, dtype=np.int16)))
+                return (in_data, pyaudio.paContinue)
+            
+            self.stream = self.p.open(format=self.p.get_format_from_width(self.WIDTH),
+                                    channels=self.CHANNELS,
+                                    rate=self.RATE,
+                                    input=True,
+                                    output=True,
+                                    frames_per_buffer = 1000,
+                                    stream_callback=callback)
+
+            self.stream.start_stream()
+            #process all events 4ever *
+            while self.stream.is_active():
+                    QtWidgets.QApplication.processEvents()
+						
+        except Exception as e:
+            print("ERROR: ",e)
+            pass
+
+
     def stop_stream(self):
         self.stream.stop_stream()
         self.stream.close()
@@ -123,9 +156,21 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.q.put(thing)
 
 
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    MainWindow  = PloterMpl()
-    MainWindow.show()
-    sys.exit(app.exec_())
+class Worker(QtCore.QRunnable):
+
+	def __init__(self, function, *args, **kwargs):
+		super(Worker, self).__init__()
+		self.function = function
+		self.args = args
+		self.kwargs = kwargs
+
+	@pyqtSlot()
+	def run(self):
+
+		self.function(*self.args, **self.kwargs)
+
+app = QtWidgets.QApplication(sys.argv)
+MainWindow  = PloterMpl()
+MainWindow.show()
+sys.exit(app.exec_())
+
