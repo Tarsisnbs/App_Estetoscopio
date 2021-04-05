@@ -20,62 +20,162 @@ from PyQt5 import uic
 import time
 import queue 
 import pyaudio
+# not in use
+class Ploter():
 
+	def __init__(self):
+		
+		#self.sample_rate = 8000
+		#self.t_sample = 1/self.sample_rate #criar método método 
+		#self.total_samples  = int(self.window*self.sample_rate/(1000))
+		self.q = queue.Queue()
+		self.samp_rate = 8000
+		self.samp_step = 1/self.samp_rate
+		self.window = 40000
+		self.window_t = self.window * self.samp_step
+		self.time_interval = 10
+
+		self.x = np.arange(0 , self.window_t , self.samp_step, dtype = float)
+		self.y = np.zeros(self.window, dtype = float)
+
+		self.fig,self.ax = plt.subplots(figsize=(8,4))
+		self.ax.set_title("plot")
+		self.ax.set_facecolor((1,1,1))
+		self.ax.set_ylim(-1.1, 1.1)
+		self.ax.set_xlim(0, self.window)
+		self.ax.grid()
+
+		self.fig,self.bx = plt.subplots(figsize=(8,4))
+		self.bx.set_title("plot")
+		self.bx.set_facecolor((1,1,1))
+		self.bx.set_ylim(-1.1, 1.1)
+		self.bx.set_xlim(0, self.window_t)
+		self.bx.grid()
+
+		print("objeto Ploter instanciado : area de plot criada")
+	
+		
+	def update_plt_list(self, i):
+		
+		data = np.array(self.get_list())/32768
+		shift = len(data)
+
+		self.y = np.roll(self.y,-shift)
+		self.y[-shift:] = data
+		xmin, xmax = self.ax.get_xlim()
+		self.x = np.roll(self.x,-shift)
+		self.x[-shift:] = np.arange(xmax,xmax + shift)
+		print(self.x)
+		
+		
+		self.ax.set_xlim(xmin + shift ,xmax + shift)
+		self.ax.figure.canvas.draw()	
+
+		self.lines = self.ax.plot(self.x, self.y, color = (0,0,0), lw=0.5)
+		return(self.lines)
+	
+
+
+	def update_plt_list_time(self, i):
+		#get samples an frame size
+		data = np.array(self.get_list())/32768
+		shift = len(data)
+		
+		#refresh y axis
+		self.y = np.roll(self.y,-shift)
+		self.y[-shift:] = data
+		
+		#refresh x axis
+		xmin, xmax = self.bx.get_xlim()
+		self.x = np.roll(self.x,-shift)
+		self.x[-shift:] = np.arange(xmax,xmax + shift*self.samp_step, self.samp_step)
+		
+		#refresh window plot limits
+		self.bx.set_xlim(xmin + shift*self.samp_step ,xmax + shift*self.samp_step)
+		self.bx.figure.canvas.draw()	
+		
+		#put all in to lines object
+		self.lines = self.bx.plot(self.x, self.y, color = (0,0,0), lw=0.5)
+		
+		return(self.lines)
+
+
+	def get_list(self): 
+		data = self.q.get() 
+	
+		return data
+
+	def put_list(self, thing):
+		self.q.put(thing)
+        
 class MplCanvas(FigureCanvas):
-    def __init__(self, parent=None , width =1, height=1, dpi=50 ):
-        self.window = 40000
-        
-        #fig = Figure(figsize=(width, height), dpi=dpi)
-        self.fig, self.axes = plt.subplots(figsize=(8,4))
-        
-        self.x_vals = []
-        self.y_vals = []
-    
-        self.axes.set_title("Original Sound")
-        self.axes.set_ylim(-1.1, 1.1)
-        self.axes.set_xlim(0, self.window)
-        self.axes.set_facecolor((1,1,1))
-        self.axes.grid()
-        FigureCanvas.__init__(self, self.fig)
-        
+	def __init__(self, parent=None, width=5, height=4, dpi=100):
+		fig = Figure(figsize=(width, height), dpi=dpi)
+		self.axes = fig.add_subplot(111)
+		super(MplCanvas, self).__init__(fig)
+		fig.tight_layout()
 
 class PloterMpl(QtWidgets.QMainWindow):
     WIDTH = 2
     CHANNELS = 1
     RATE = 8000
+    
     def __init__(self):
-        self.interval = 30
-        self.time_interval = 20
 
-        #define new Qthread
+        #plot props just copied, need check*
+        self.samp_rate = 8000
+        self.samp_step = 1/self.samp_rate
+        self.window = 8000
+        self.window_t = self.window * self.samp_step
+        self.time_interval = 10 
+
+        #define np arrays data x and y
+        self.x = np.arange(0 , self.window_t , self.samp_step, dtype = float)
+        self.y = np.zeros(self.window, dtype = float)
+        
+        #define fig to plot
+        self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
+        
+        #timer plot refresh interval (ms)
+        self.interval = 30
+
+        #define new Qthread for pyaudio
         self.threadpool = QtCore.QThreadPool()	
         self.threadpool.setMaxThreadCount(1)
 
+        #buffer
         self.q = queue.Queue()
-        self.canvas = MplCanvas(self, width=5, height=4, dpi=50)
+        
+        self.plot_now = False
+        
         
         QtWidgets.QMainWindow.__init__(self)
         self.resize(1024, 600)
-        
         self.ui = uic.loadUi('main.ui', self)
+
         self.ui.gridLayout_3.addWidget(self.canvas, 0, 1, 2, 1)
         
+        #timer for update plt
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(self.interval) #msec
+        self.timer.timeout.connect(self.update_plt_list)
+        self.timer.start()
 
         self.p = pyaudio.PyAudio()
-        print("objeto instanciado: p -> Pyaudio()")
         
         self.pushButton.clicked.connect(self.start_worker)
         self.pushButton_2.clicked.connect(self.stop_stream)
         self.worker = None
         print('Setup ok')
-    
+
+
     def start_worker(self):
         # disable all user imputs
         #clear axes plot
 
         #self.canvas.axes.clear()
         #self.go_on = False
-
+        self.canvas.axes.clear()
         #set thread with start_audio()
         self.worker = Worker(self.start_audio, )
         self.threadpool.start(self.worker)	
@@ -120,36 +220,40 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.p.terminate()
 
     def update_plt_list(self):
-        data = self.get_list()
-        shift = len(data)
-        self.canvas.y_vals.extend(data)
-        self.canvas.x_vals = list(range(0, (len(self.canvas.y_vals))))
-        xmin, xmax = self.canvas.axes.get_xlim()
-        if len(self.canvas.x_vals)> self.canvas.window:
-            #shift frame and signal
-            del self.canvas.y_vals[:shift]
-            del self.canvas.x_vals[:shift]
-            self.canvas.axes.set_xlim(xmax,xmax + self.canvas.window)
-            #redraw all
-            self.canvas.axes.figure.canvas.draw()
-            #update x axys
-            for n in range (len(self.canvas.x_vals)):
-                self.canvas.x_vals[n] = n + xmax
-            ###########
-        print(self.canvas.y_vals)
-        self.lines = self.canvas.axes.plot(np.array(self.canvas.x_vals), np.array(self.canvas.y_vals)/32768, color = (0,0,0), lw=0.5)
+        print('ACTIVE THREADS:',self.threadpool.activeThreadCount(),end=" \r")
+        while True:
+            QtWidgets.QApplication.processEvents()
+            try: 
+                #self.data = self.q.get_nowait()
+                data = np.array(self.get_list())/32768
+
+            except queue.Empty:
+                break
+            
+            shift = len(data)
+            
+            self.canvas.axes.set_facecolor((0,0,0))
+            self.y = np.roll(self.y,-shift) 
+            self.y[-shift:] = data  
+            #self.y = data[:]
+            self.canvas.axes.set_facecolor((1,1,1))
+            self.canvas.axes.plot( self.y, color=(0,1,0.29))
+        print(len(self.y))
+        self.canvas.axes.set_ylim( ymin=-1, ymax=1)
+        self.canvas.axes.yaxis.grid(True,linestyle='--')
+        start, end = self.canvas.axes.get_ylim()
+        self.canvas.axes.yaxis.set_ticks(np.arange(start, end, 0.1))
+        self.canvas.axes.yaxis.set_major_formatter(ticker.FormatStrFormatter('%0.1f'))
+        self.canvas.axes.set_ylim( ymin=-0.5, ymax=0.5)	
         self.canvas.draw()
 
-        
-        #print("n samples:", len(self.y_vals), "n shift samp:", shift)
-        return(self.lines)
-    #def run_loop(self):
-        
+
+
     def run_loop(self):
         plt.show()
 
     def get_list(self):  
-        data = self.q.get() 
+        data = self.q.get_nowait() 
         return data
 
     def put_list(self, thing):
