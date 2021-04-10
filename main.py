@@ -82,13 +82,6 @@ class PloterMpl(QtWidgets.QMainWindow):
 
 
     def start_worker(self):
-        # disable all user imputs
-        #clear axes plot
-
-        #self.canvas.axes.clear()
-        #self.go_on = False
-        #self.canvas.axes.clear()
-        #set thread with start_audio()
         self.worker = Worker(self.start_audio, )
         self.threadpool.start(self.worker)	
         
@@ -140,26 +133,28 @@ class PloterMpl(QtWidgets.QMainWindow):
                 QtWidgets.QApplication.processEvents()
             
                 try: 
-            
-                    #self.data = self.q.get_nowait()
-            
-                    data = np.array(self.q.get_nowait())/32768
+                     data = np.array(self.q.get_nowait())/32768
 
-
-            
                 except queue.Empty:
             
                     break
                 shift = len(data)
-                self.y = np.roll(self.y,-shift)
-                self.y[-shift:] = data
+        
                 xmin, xmax = self.canvas.axes.get_xlim()
+                if( self.x[0] < self.window_t): 
+                    self.y[:shift] = data
+                    print("buffering x:", self.x[0])
+                else: 
+                    self.y = np.roll(self.y,-shift)
+                    self.y[-shift:] = data
+                    self.canvas.axes.set_xlim(xmin + shift*self.samp_step ,xmax + shift*self.samp_step)
+
                 self.x = np.roll(self.x,-shift)
                 self.x[-shift:] = np.arange(xmax,xmax + shift* self.samp_step, self.samp_step)
-                print(xmax, xmin)
+                
                 #self.y = data[:]
                 self.canvas.axes.set_facecolor((1,1,1))
-                self.canvas.axes.set_xlim(xmin + shift*self.samp_step ,xmax + shift*self.samp_step)
+                
                 self.canvas.axes.plot(self.x, self.y, color = (0,1,0), lw=0.5)
                 self.canvas.axes.set_ylim( ymin=-1, ymax=1)
            
@@ -169,8 +164,6 @@ class PloterMpl(QtWidgets.QMainWindow):
         except Exception as e:
             print("Error:",e)
         pass
-
-
 
     def run_loop(self):
         plt.show()
