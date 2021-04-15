@@ -22,44 +22,48 @@ import soundfile as sf
 
 class Ploter (FigureCanvas):
     
-    def __init__(self, window_t, samp_step, parent=None, width=5, height=4, dpi=100 ):
+    def __init__(self,obj, samp_rate, parent=None, width=5, height=4, dpi=100 ):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
         super(Ploter, self).__init__(fig)
-        #plot props just copied, need check*
-        self.samp_step = 1/8000
+        #atributos
+        #regras de negocio (mudar de lugar)
+        self.samp_rate = samp_rate
+        self.samp_step = 1/self.samp_rate
         self.window_t = 2
-        self.window = 16000
-        self.axes.set_xlim(0, self.window_t)
-        self.time_interval = 30 
+        self.window = self.window_t/self.samp_step
 
-        #define np arrays data x and y
-        self.x = np.arange(0 , self.window_t , self.samp_step, dtype = float)
-        self.y = np.zeros(self.window, dtype = float)
+        self.x, self.y = self.init_plot_axis(self.window_t, self.samp_rate)
+        self.axes.set_xlim(0, self.window_t)
         fig.tight_layout()
     
-    pass
-    def plot_signal(self, signal, samp_step):
+    def init_plot_axis(self, window_t, samp_rate):
+        samp_step = 1/samp_rate
+        window_s = window_t*samp_rate
+        x = np.arange(0 , window_t , samp_step, dtype = float)
+        y = np.zeros(window_s, dtype=float)
+        return (x,y)
+
+    def plot_signal(self, signal): #public
         self.axes.clear()
-        self.axes.plot(np.arange(0,len(signal)*samp_step,samp_step), signal, color = (0,1,0), lw=0.5)
+        self.axes.plot(np.arange(0,len(signal)*self.samp_step,self.samp_step), signal, color = (0,1,0), lw=0.5)
         self.draw()
-        
-    def plot_real_time (self,data, samp_step, window_t):
+    
+    def process_plot(self, data):
         shift = len(data)
-        
         xmin, xmax = self.axes.get_xlim()
-        
-        if( self.x[0] < window_t): 
+        if( self.x[0] < self.window_t): 
             self.y[:shift] = data
-            print("buffering x:", self.x[0])
         else: 
             self.y = np.roll(self.y,-shift)
             self.y[-shift:] = data
-            self.axes.set_xlim(xmin + shift*samp_step ,xmax + shift*samp_step)
+            self.axes.set_xlim(xmin + shift*self.samp_step ,xmax + shift*self.samp_step)
         
         self.x = np.roll(self.x,-shift)
         self.x[-shift:] = np.arange(xmax,xmax + shift* self.samp_step, self.samp_step)
-        
+
+    def plot_real_time (self,data): #public
+        self.process_plot(data)
         self.axes.set_facecolor((1,1,1))
         self.axes.set_ylim( ymin=-1, ymax=1)
         self.axes.plot(self.x, self.y, color = (0,1,0), lw=0.5)
@@ -69,6 +73,7 @@ class Ploter (FigureCanvas):
 class Registrador(): 
     def __init__(self):
         pass
+  
     def save_wav(audio_array): 
         sf.write('stereo_file.wav', audio_array, 8000, 'PCM_24') 
 
@@ -84,14 +89,10 @@ class PloterMpl(QtWidgets.QMainWindow):
     
     def __init__(self):
 
-        #plot props just copied, need check*
+        #plot props
         self.samp_rate = 8000
-        self.samp_step = 1/self.samp_rate
-        self.window = 16000
-        self.window_t = self.window * self.samp_step
-        self.time_interval = 30 
         
-        self.canvas = Ploter(self, self.samp_step, self.window_t, width=5, height=4, dpi=100)
+        self.canvas = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
         self.interval = 30
 
         #define new Qthread for pyaudio
@@ -102,7 +103,6 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.q = queue.Queue()
         self.plot_now = False
         
-        #self.audio_array = np.arange(0, self.audio_size*self.samp_rate, dtype = float)
         self.audio_list = []
         QtWidgets.QMainWindow.__init__(self)
         self.resize(1024, 600)
@@ -112,10 +112,10 @@ class PloterMpl(QtWidgets.QMainWindow):
         
         #timer for update plt
         self.timer = QtCore.QTimer()
-        self.timer.setInterval(self.interval) #msec
-        self.timer.timeout.connect(self.update_plt_list)
+        self.timer.setInterval(self.interval)
+        self.timer.timeout.connect(self.update_system)
         self.timer.start()
-        self.reference_plot = None
+
         self.p = pyaudio.PyAudio()
         
         self.pushButton.clicked.connect(self.start_worker)
@@ -127,12 +127,7 @@ class PloterMpl(QtWidgets.QMainWindow):
     def start_worker(self):
         self.worker = Worker(self.start_audio, )
         self.threadpool.start(self.worker)	
-        
-        self.reference_plot = None
         self.timer.setInterval(self.interval) 
-
-    def new_method(self):
-         self.lineEdit.setEnabled(False)#msec
 
     def start_audio(self):
         try:
@@ -163,27 +158,22 @@ class PloterMpl(QtWidgets.QMainWindow):
 
     def stop_stream(self):
         sf.write('audio_file.wav', np.array(self.audio_list)/32768, 8000) 
-        self.canvas.plot_signal(np.array(self.audio_list)/32768, self.samp_step)
+        self.canvas.plot_signal(np.array(self.audio_list)/32768)
         self.stream.stop_stream()
         self.stream.close()
         self.p.terminate()
 
-    def update_plt_list(self):
+    def update_system(self):
         try:
-            #print('ACTIVE THREADS:',self.threadpool.activeThreadCount(),end=" \r")
-            
             while True:
-            
                 QtWidgets.QApplication.processEvents()
-            
                 try: 
                     data_list = self.q.get_nowait()
                     data = np.array(data_list)/32768
-
                 except queue.Empty:
             
                     break
-                self.canvas.plot_real_time(data, self.samp_step, self.window_t)
+                self.canvas.plot_real_time(data)
                 self.audio_list.extend(data_list)
         except Exception as e:
             print("Error:",e)
