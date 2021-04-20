@@ -67,7 +67,6 @@ class Ploter (FigureCanvas):
         self.axes.set_facecolor((1,1,1))
         self.axes.set_ylim( ymin=-1, ymax=1)
         self.axes.plot(self.x, self.y, color = (0,1,0), lw=0.5)
-        print(self.x)
         self.draw()       
 
 class Registrador(): 
