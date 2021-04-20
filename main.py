@@ -10,7 +10,7 @@ import sys
 import matplotlib 
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
+
 import matplotlib.ticker as ticker
 import numpy as np
 from PyQt5.QtCore import pyqtSlot
@@ -18,8 +18,8 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5 import uic
 import queue 
 import pyaudio
-import soundfile as sf
 
+from matplotlib.figure import Figure
 class Ploter (FigureCanvas):
     
     def __init__(self,obj, samp_rate, parent=None, width=5, height=4, dpi=100 ):
@@ -67,18 +67,39 @@ class Ploter (FigureCanvas):
         self.axes.set_facecolor((1,1,1))
         self.axes.set_ylim( ymin=-1, ymax=1)
         self.axes.plot(self.x, self.y, color = (0,1,0), lw=0.5)
-        self.draw()       
-
+        self.draw()
+        
+    def clear_plot(self): #Não testado
+        self.axes.clear()
+        pass
+               
+import soundfile as sf
 class Registrador(): 
-    def __init__(self):
-        pass
-  
-    def save_wav(audio_array): 
-        sf.write('stereo_file.wav', audio_array, 8000, 'PCM_24') 
-
-    def load_wav(): 
-        pass
+    def __init__(self, samp_rate):
+        self.audio_memorized = []
+        self.samp_rate = samp_rate
     
+    def get_audio_signal_np(self):
+        audio_array = np.array(self.audio_memorized)/32768 #Audio NP Array NORM
+        return audio_array
+
+    def extend_signal(self, data):
+        self.audio_memorized.extend(data)
+
+    def save_wav(self): 
+        sf.write('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24') 
+
+    def load_wav(self): 
+        self.audio_memorized = sf.read('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24')
+        
+    
+    def clear_memory(self): #Não testado
+        self.audio_memorized = [] 
+    
+class Filter(): 
+    
+
+
     pass
 
 class PloterMpl(QtWidgets.QMainWindow):
@@ -102,7 +123,9 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.q = queue.Queue()
         self.plot_now = False
         
-        self.audio_list = []
+        #Armazenamento
+        self.registrador = Registrador(self.samp_rate)
+
         QtWidgets.QMainWindow.__init__(self)
         self.resize(1024, 600)
         self.ui = uic.loadUi('main.ui', self)
@@ -119,6 +142,7 @@ class PloterMpl(QtWidgets.QMainWindow):
         
         self.pushButton.clicked.connect(self.start_worker)
         self.pushButton_2.clicked.connect(self.stop_stream)
+        self.pushButton_3.clicked.connect(self.clear_all)
         self.worker = None
         print('Setup ok')
 
@@ -156,8 +180,8 @@ class PloterMpl(QtWidgets.QMainWindow):
             pass
 
     def stop_stream(self):
-        sf.write('audio_file.wav', np.array(self.audio_list)/32768, 8000) 
-        self.canvas.plot_signal(np.array(self.audio_list)/32768)
+        self.registrador.save_wav()
+        self.canvas.plot_signal(self.registrador.get_audio_signal_np())
         self.stream.stop_stream()
         self.stream.close()
         self.p.terminate()
@@ -173,7 +197,7 @@ class PloterMpl(QtWidgets.QMainWindow):
             
                     break
                 self.canvas.plot_real_time(data)
-                self.audio_list.extend(data_list)
+                self.registrador.extend_signal(data_list)
         except Exception as e:
             print("Error:",e)
         pass
@@ -188,7 +212,12 @@ class PloterMpl(QtWidgets.QMainWindow):
     def put_list(self, thing):
         self.q.put(thing)
 
+    def clear_all(self): 
+        self.canvas.clear_plot
+        self.registrador.clear_memory
+        QtWidgets.QApplication.processEvents()
 
+        
 class Worker(QtCore.QRunnable):
 
 	def __init__(self, function, *args, **kwargs):
