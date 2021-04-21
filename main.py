@@ -77,30 +77,58 @@ import soundfile as sf
 class Registrador(): 
     def __init__(self, samp_rate):
         self.audio_memorized = []
+        self.audio_f_memorized = []
         self.samp_rate = samp_rate
     
     def get_audio_signal_np(self):
         audio_array = np.array(self.audio_memorized)/32768 #Audio NP Array NORM
         return audio_array
+    
+    def get_audio_signal_filt_np(self):
+        audio_array = np.array(self.audio_f_memorized)/32768 #Audio NP Array NORM
+        return audio_array
+
+    def set_signal_f(self, data):
+        self.audio_f_memorized= data
 
     def extend_signal(self, data):
         self.audio_memorized.extend(data)
 
     def save_wav(self): 
         sf.write('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24') 
-
+        sf.write('audio_f_file.wav', self.audio_f_memorized, self.samp_rate, 'PCM_24') 
+        '''
+        if(self.audio_f_memorized == []):
+            pass
+        else:
+            sf.write('audio_f_file.wav', self.audio_f_memorized, self.samp_rate, 'PCM_24') 
+        '''
     def load_wav(self): 
         self.audio_memorized = sf.read('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24')
         
     
     def clear_memory(self): #Não testado
         self.audio_memorized = [] 
-    
+
+from scipy.signal import butter, lfilter, lfilter_zi, freqs    
 class Filter(): 
-    
+    def __init__(self, lowcut, highcut, samp_rate):
+        self.b, self.a = self.butter_bandpass(lowcut, highcut, samp_rate)
 
+    def butter_bandpass(self, lowcut, highcut, sRate):
+        order=2
+        nyq = 0.5 * sRate
+        low = lowcut / nyq
+        high = highcut / nyq
+        b, a = butter(order, [low, high], btype='band')
+        w, h = freqs(a, b)
+        print(a, b)
+        return b, a
 
-    pass
+    def filtrar_sin(self, data):
+        zi = lfilter_zi(self.b, self.a)
+        y,zo = lfilter(self.b, self.a, data, zi=zi*data[0])
+        return y
 
 class PloterMpl(QtWidgets.QMainWindow):
     WIDTH = 2
@@ -108,6 +136,9 @@ class PloterMpl(QtWidgets.QMainWindow):
     RATE = 8000
     
     def __init__(self):
+
+        #Flags
+        self.GRAVANDO = False
 
         #plot props
         self.samp_rate = 8000
@@ -126,6 +157,9 @@ class PloterMpl(QtWidgets.QMainWindow):
         #Armazenamento
         self.registrador = Registrador(self.samp_rate)
 
+        #Filtragem 
+        self.filtro = Filter(500, 2000, self.samp_rate)
+
         QtWidgets.QMainWindow.__init__(self)
         self.resize(1024, 600)
         self.ui = uic.loadUi('main.ui', self)
@@ -135,7 +169,7 @@ class PloterMpl(QtWidgets.QMainWindow):
         #timer for update plt
         self.timer = QtCore.QTimer()
         self.timer.setInterval(self.interval)
-        self.timer.timeout.connect(self.update_system)
+        self.timer.timeout.connect(self.gravar)
         self.timer.start()
 
         self.p = pyaudio.PyAudio()
@@ -143,11 +177,14 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.pushButton.clicked.connect(self.start_worker)
         self.pushButton_2.clicked.connect(self.stop_stream)
         self.pushButton_3.clicked.connect(self.clear_all)
+        self.pushButton_4.clicked.connect(self.filtrar)
+        self.pushButton_10.clicked.connect(self.salvar)
         self.worker = None
         print('Setup ok')
 
 
     def start_worker(self):
+        self.GRAVANDO = True
         self.worker = Worker(self.start_audio, )
         self.threadpool.start(self.worker)	
         self.timer.setInterval(self.interval) 
@@ -180,8 +217,9 @@ class PloterMpl(QtWidgets.QMainWindow):
             pass
 
     def stop_stream(self):
-        self.registrador.save_wav()
+        self.GRAVANDO = False
         self.canvas.plot_signal(self.registrador.get_audio_signal_np())
+        
         self.stream.stop_stream()
         self.stream.close()
         self.p.terminate()
@@ -217,6 +255,36 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.registrador.clear_memory
         QtWidgets.QApplication.processEvents()
 
+    def gravar(self): 
+        
+        try:
+            while self.GRAVANDO == True:
+                QtWidgets.QApplication.processEvents()
+                try: 
+                    data_list = self.q.get_nowait()
+                    data = np.array(data_list)/32768
+                except queue.Empty:
+            
+                    break
+                self.canvas.plot_real_time(data)
+                self.registrador.extend_signal(data_list)
+            
+        except Exception as e:
+            print("Error:",e)
+        pass
+        pass
+
+    def filtrar(self):
+        sinal = self.registrador.get_audio_signal_np()
+        sinal_f = self.filtro.filtrar_sin(sinal)
+        self.registrador.set_signal_f(sinal_f) 
+        self.canvas.plot_signal(sinal_f)
+        pass 
+    def play(): 
+        pass 
+    def salvar(self): 
+        self.registrador.save_wav()
+        pass
         
 class Worker(QtCore.QRunnable):
 
@@ -235,3 +303,5 @@ app = QtWidgets.QApplication(sys.argv)
 MainWindow  = PloterMpl()
 MainWindow.show()
 sys.exit(app.exec_())
+
+
