@@ -19,6 +19,24 @@ from PyQt5 import uic
 import queue 
 import pyaudio
 
+#Struct of State Machine with all the valid states and yor transictions (flag plus next state)
+#the structure is a fork described by a list dictionary
+#like: {VALID_STATE:[(flag_A, state_A), (flag_B, state_B)]} for a valid state with two possibles transictions (A and B)
+
+struct_state_machine = {"INICIO":[("setup_end","ESPERANDO")], "ESPERANDO":[("rec_now","GRAVANDO"), ("filter_now","FILTRANDO"), ("save_now", "SALVANDO"), 
+                        ("open_now", "CARREGANDO"), ("clear_now", "CLEARING"), ("play_now", "REPRODUZINDO")], "GRAVANDO":[("wait_now", "ESPERANDO")], 
+                        "FILTRANDO":[("wait_now", "ESPERANDO")], "SALVANDO":[("wait_now", "ESPERANDO")], "CARREGANDO":[("wait_now", "ESPERANDO")], "CLEARING":[("wait_now", "ESPERANDO")], 
+ 
+                        "REPRODUZINDO":[("wait_now", "ESPERANDO")], "PAUSE":[("wait_now", "ESPERANDO")]}
+
+#Dictionary with the state of all flags of the system
+flags_status = {"setup_end":False, "rec_now":False, "rec_end":False, "filter_now":False, "save_now":False, "open_now":False, "clear_now":False, "play_now":False, "pause_now":False, "wait_now":False}
+
+def print_log(string):
+    s = string
+    l = sys.stdout.write("\r", s, "\n")
+    sys.stdout.flush()
+
 from matplotlib.figure import Figure
 class Ploter (FigureCanvas):
     
@@ -51,17 +69,17 @@ class Ploter (FigureCanvas):
     
     def process_plot(self, data):
         shift = len(data)
+        
         xmin, xmax = self.axes.get_xlim()
         if( self.x[0] < self.window_t): 
             self.y[:shift] = data
+            
         else: 
             self.y = np.roll(self.y,-shift)
             self.y[-shift:] = data
             self.axes.set_xlim(xmin + shift*self.samp_step ,xmax + shift*self.samp_step)
-        
         self.x = np.roll(self.x,-shift)
         self.x[-shift:] = np.arange(xmax,xmax + shift* self.samp_step, self.samp_step)
-
     def plot_real_time (self,data): #public
         self.process_plot(data)
         self.axes.set_facecolor((1,1,1))
@@ -136,9 +154,9 @@ class PloterMpl(QtWidgets.QMainWindow):
     RATE = 8000
     
     def __init__(self):
-
+        self.current_state = "INICIO"
         #Flags
-        self.GRAVANDO = False
+        self.call_rec_td = False
 
         #plot props
         self.samp_rate = 8000
@@ -169,36 +187,45 @@ class PloterMpl(QtWidgets.QMainWindow):
         #timer for update plt
         self.timer = QtCore.QTimer()
         self.timer.setInterval(self.interval)
-        self.timer.timeout.connect(self.gravar)
+        self.timer.timeout.connect(self.update_system)
         self.timer.start()
 
         self.p = pyaudio.PyAudio()
         
-        self.pushButton.clicked.connect(self.start_worker)
-        self.pushButton_2.clicked.connect(self.stop_stream)
-        self.pushButton_3.clicked.connect(self.clear_all)
-        self.pushButton_4.clicked.connect(self.filtrar)
-        self.pushButton_10.clicked.connect(self.salvar)
+        self.pushButton.clicked.connect(lambda: self.set_flag ("rec_now"))
+        self.pushButton_2.clicked.connect(lambda: self.set_flag ("wait_now"))
+        self.pushButton_3.clicked.connect(lambda: self.set_flag("clear_now"))
+        self.pushButton_4.clicked.connect(lambda: self.set_flag("filter_now"))
+        self.pushButton_10.clicked.connect(lambda: self.set_flag("save_now"))
         self.worker = None
+        flags_status["setup_end"] = True
         print('Setup ok')
+    
+    def set_flag(self, flag):
+        flags_status[flag] = True
 
-
+    def state_machine_run(self, current_state):
+        for i in range (len(struct_state_machine[current_state])): # Percorre lista de flags de current_state 
+            if flags_status[struct_state_machine[current_state][i][0]]: # Procura por flags ativas em current_state
+                flags_status[struct_state_machine[current_state][i][0]] = False # desativa a respectiva flag
+                current_state = struct_state_machine[current_state][i][1] # current_state = "next_state(flag = true)"
+                break
+        return current_state # Retorna o Próximo Estado (next_state ou current_state)
+     
     def start_worker(self):
-        self.GRAVANDO = True
+        print("instanciando worker...")
         self.worker = Worker(self.start_audio, )
         self.threadpool.start(self.worker)	
         self.timer.setInterval(self.interval) 
-
+        self.call_rec_td = False # for don't call rec thread again 
     def start_audio(self):
         try:
             #process all events
             QtWidgets.QApplication.processEvents()
-
             #define callback and stream
             def callback(in_data, frame_count, time_info, status):
                 self.put_list((np.frombuffer(in_data, dtype=np.int16)))
                 return (in_data, pyaudio.paContinue)
-            
             self.stream = self.p.open(format=self.p.get_format_from_width(self.WIDTH),
                                     channels=self.CHANNELS,
                                     rate=self.RATE,
@@ -206,39 +233,69 @@ class PloterMpl(QtWidgets.QMainWindow):
                                     output=True,
                                     frames_per_buffer = 1000,
                                     stream_callback=callback)
-
             self.stream.start_stream()
-            #process all events 4ever *
+            
             while self.stream.is_active():
                     QtWidgets.QApplication.processEvents()
-						
+                    self.gravar()
+                    if self.current_state != "GRAVANDO":
+                        print("stoping streaming")
+                        break
+            print("exiting streaming audio")
+            self.stream.stop_stream()
+            self.stream.close()
+            self.end_rec()
+            #self.p.terminate()	
         except Exception as e:
-            print("ERROR: ",e)
+            print("ERROR: pyaudio ",e)
             pass
 
-    def stop_stream(self):
-        self.GRAVANDO = False
-        self.canvas.plot_signal(self.registrador.get_audio_signal_np())
-        
-        self.stream.stop_stream()
-        self.stream.close()
-        self.p.terminate()
-
-    def update_system(self):
+    def end_rec(self):
         try:
+            self.canvas.plot_signal(self.registrador.get_audio_signal_np())
+        except Exception as e: 
+            print(e)
+    def update_system(self):
+        
+        try:
+            #print('ACTIVE THREADS:',self.threadpool.activeThreadCount(),end=" \r")
             while True:
                 QtWidgets.QApplication.processEvents()
-                try: 
-                    data_list = self.q.get_nowait()
-                    data = np.array(data_list)/32768
-                except queue.Empty:
-            
-                    break
-                self.canvas.plot_real_time(data)
-                self.registrador.extend_signal(data_list)
+                self.current_state = self.state_machine_run(self.current_state)
+
+                if self.current_state == "GRAVANDO": 
+                    if self.call_rec_td: 
+                        self.start_worker()
+                    lol = "gravando"
+                    print_log(lol)
+                    #self.gravar()
+                    #self.stop_stream()
+                elif self.current_state == "FILTRANDO":
+                   # self.print_log("filtrando")
+                    self.filtrar()
+                elif self.current_state == "SALVANDO": 
+                    #self.print_log("salvando")
+                    self.salvar
+                elif self.current_state == "CARREGANDO":
+                   # self.print_log("carregando")
+                    pass
+                elif self.current_state == "CLEARING":
+                   # self.print_log("clearing all")
+                    self.clear_all()
+                elif self.current_state == "REPRODUZINDO":
+                   # self.print_log("reproduzindo")
+                    pass
+                elif self.current_state == "ESPERANDO":
+                   # self.print_log("esperando...")
+                    if self.call_rec_td == False: 
+                        self.call_rec_td = True 
+
+                else:
+                    
+                    pass
         except Exception as e:
-            print("Error:",e)
-        pass
+            print("Error: state swich",e)
+        #pass
 
     def run_loop(self):
         plt.show()
@@ -253,12 +310,11 @@ class PloterMpl(QtWidgets.QMainWindow):
     def clear_all(self): 
         self.canvas.clear_plot
         self.registrador.clear_memory
-        QtWidgets.QApplication.processEvents()
-
+        sys.exit(app.exec_())
     def gravar(self): 
         
         try:
-            while self.GRAVANDO == True:
+            while True:
                 QtWidgets.QApplication.processEvents()
                 try: 
                     data_list = self.q.get_nowait()
@@ -270,16 +326,20 @@ class PloterMpl(QtWidgets.QMainWindow):
                 self.registrador.extend_signal(data_list)
             
         except Exception as e:
-            print("Error:",e)
-        pass
-        pass
+            print("Error 'gravando':",e)
+        #pass
+        #pass
 
     def filtrar(self):
-        sinal = self.registrador.get_audio_signal_np()
-        sinal_f = self.filtro.filtrar_sin(sinal)
-        self.registrador.set_signal_f(sinal_f) 
-        self.canvas.plot_signal(sinal_f)
-        pass 
+        try:
+            sinal = self.registrador.get_audio_signal_np()
+            sinal_f = self.filtro.filtrar_sin(sinal)
+            self.registrador.set_signal_f(sinal_f) 
+            self.canvas.plot_signal(sinal_f)
+            self.set_flag("wait_now")
+        except:
+            pass 
+
     def play(): 
         pass 
     def salvar(self): 
