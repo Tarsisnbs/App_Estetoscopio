@@ -6,19 +6,21 @@
 
 #bibliotecas essenciais 
 from PyQt5.QtGui import QDragEnterEvent, QDragMoveEvent
+from matplotlib.backend_bases import Event
 import matplotlib.pyplot as plt
 import sys 
-import matplotlib 
+import matplotlib
+from numpy.lib.financial import rate 
 matplotlib.use('Qt5Agg')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
 
 import matplotlib.ticker as ticker
 import numpy as np
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtCore import QEvent, pyqtSlot
 from PyQt5 import QtCore, QtWidgets
 from PyQt5 import uic
 import queue 
-import pyaudio
+
 import scipy.signal as signal
 from scipy.signal import butter, lfilter, lfilter_zi, freqs
 
@@ -32,29 +34,10 @@ struct_state_machine = {"INICIO":[("setup_end","ESPERANDO")], "ESPERANDO":[("rec
 
 #Dictionary with the state of all flags of the system
 flags_status = {"setup_end":False, "rec_now":False, "rec_end":False, "filter_now":False, "save_now":False, "open_now":False, "clear_now":False, "play_now":False, "pause_now":False, "wait_now":False}
-'''
-@staticmethod
-def print_log(string=s):
-    s = string
-    l = sys.stdout.write("\r", s, "\n")
-    sys.stdout.flush()
-'''
 
-class State():
-    def __init__(self,current_state, next_state, condition_flag):
-        self.state_name = current_state
-        self.next_state = next_state
-        self.condition_flag = condition_flag
-
-    def check_flag(self, flag_status):
-        if flag_status[self.condition_flag]:
-            return self.next_state
-        else: 
-            return self.state_name
-    def go_next_state(self):
-        self.state_name = self.next_state
 
 from scipy.fft import fft, fftfreq
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 class Ploter (FigureCanvas):
     
@@ -62,8 +45,6 @@ class Ploter (FigureCanvas):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
         super(Ploter, self).__init__(fig)
-        #atributos
-        #regras de negocio (mudar de lugar)
         self.samp_rate = samp_rate
         self.samp_step = 1/self.samp_rate
         self.window_t = 2
@@ -82,12 +63,9 @@ class Ploter (FigureCanvas):
         y = np.zeros(window_s, dtype=float)
         return (x,y)
 
-    def plot_signal(self, signal): #public
-        
+    def plot_signal(self, signal): 
         if self.freq_dom == True:
-            print("lol")
             self.plot_freq(signal)
-            
         else:
             self.axes.clear()
             self.axes.grid()
@@ -97,11 +75,9 @@ class Ploter (FigureCanvas):
 
     def process_plot(self, data):
         shift = len(data)
-        
         xmin, xmax = self.axes.get_xlim()
         if( self.x[0] < self.window_t): 
-            self.y[:shift] = data
-            
+            self.y[:shift] = data    
         else: 
             self.y = np.roll(self.y,-shift)
             self.y[-shift:] = data
@@ -109,7 +85,7 @@ class Ploter (FigureCanvas):
         self.x = np.roll(self.x,-shift)
         self.x[-shift:] = np.arange(xmax,xmax + shift* self.samp_step, self.samp_step)
     
-    def plot_real_time (self,data): #public
+    def plot_real_time (self,data): 
         self.process_plot(data)
         self.axes.set_facecolor((1,1,1))
         self.axes.set_ylim( ymin=-1, ymax=1)
@@ -118,7 +94,7 @@ class Ploter (FigureCanvas):
 
     def plot_mark_time(self, current_time):
         print("time: ", current_time)
-        n = self.axes.axvline((current_time), color='green') #
+        n = self.axes.axvline((current_time), color='green') 
         self.draw()
         plt.Axes.remove(n)
 
@@ -146,20 +122,43 @@ class Registrador():
         self.filters_memorized = {"PB":[], "PA":[], "NT":[]}
         self.audio_memorized = []
         self.audio_f_memorized = []
+        self.audio_to_play = []
         self.samp_rate = samp_rate
         self.time_player = 0
-    ##############
-    def get_audio_signal_np(self):
+    
+    def set_signal_to_play(self, s):
+        if s == 2:
+            self.audio_to_play = self.get_signal_filt_not_norm()
+        else: 
+            self.audio_to_play = self.audio_memorized
+
+    def get_signal_to_play(self):
+        try:
+            s = np.array(self.audio_to_play)
+            return s
+        except: 
+            print("nenhum sinal selecionado para enviar ao player")
+            pass
+   
+    def get_signal_not_norm(self):
+        audio_array = np.array(self.audio_memorized)
+        return audio_array
+
+    def get_signal_norm(self):
         audio_array = np.array(self.audio_memorized)/32768 #Audio NP Array NORM
         return audio_array
     
-    def get_audio_signal_filt_np(self):
-        audio_array = np.array(self.audio_f_memorized)/32768 #Audio NP Array NORM
+    def get_signal_filt_not_norm(self):
+        audio_array = np.array(self.audio_f_memorized)*32768 #Audio NP Array NORM
+        audio_array = audio_array.astype(np.int16)
+        return audio_array
+
+    def get_signal_filt_norm(self):
+        audio_array = np.array(self.audio_f_memorized) #Audio NP Array NORM
         return audio_array
 
     def get_time_player(self): 
         return self.time_player
-    #############metodos de manipulação de sinais por canal
 
     def set_filters_memorized(self,a_b, filter=""):
         self.filters_memorized[filter] = a_b
@@ -190,6 +189,44 @@ class Registrador():
     def clear_memory(self): #Não testado
         self.audio_memorized = [] 
 
+import pyaudio
+class Player():
+    WIDTH = 2
+    CHANNELS = 1
+    RATE = 8000
+    def __init__(self):
+        self.current_time = 0
+        self.FRAME_SIZE = 1000
+        self.p = pyaudio.PyAudio()
+        self.stream = None
+        self.end_player = False
+    
+    def open_stream(self):
+        self.stream = self.p.open(
+                    format=self.p.get_format_from_width(self.WIDTH),
+                    channels=self.CHANNELS,
+                    rate=self.RATE,
+                    input=True,
+                    output=True,
+                    frames_per_buffer = 1000,
+                    )
+    
+    def rec(self):
+        data_frame = self.stream.read(1000)
+        time = self.play_frame(data_frame)
+        return (np.frombuffer(data_frame, dtype=np.int16), time)
+        
+    def play_frame(self, data_frame):
+        self.stream.write(data_frame, 1000)
+        self.current_time = self.current_time + 1000
+        return self.current_time
+        
+    def stop(self):
+        print("stop")
+        self.current_time = 0
+        self.stream.stop_stream()
+        self.stream.close()
+
 from scipy.signal import butter, lfilter, lfilter_zi, freqs    
 class Filter(): 
     def __init__(self, lowcut, highcut, samp_rate):
@@ -210,24 +247,13 @@ class Filter():
         y,zo = lfilter(self.b, self.a, data, zi=zi*data[0])
         return y
 
-class Player():
-    def __init__(self):
-        self.current_time = 0
-    def rec(self): 
-        pass 
-    def play_frame(self, data_frame):
-        
-        
-        pass
-    def stop():
-        pass
-
-class PloterMpl(QtWidgets.QMainWindow):
+class MainApp(QtWidgets.QMainWindow):
     WIDTH = 2
     CHANNELS = 1
     RATE = 8000
     
     def __init__(self):
+
         self.current_state = "INICIO"
         #Flags
         self.call_rec_td = False
@@ -235,8 +261,10 @@ class PloterMpl(QtWidgets.QMainWindow):
         #plot props
         self.samp_rate = 8000
         
-        self.canvas = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
+        self.canvas1 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
         self.canvas2 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
+        self.track_channel = [self.canvas1, self.canvas2]
+
         self.interval = 30
         #define new Qthread for pyaudio
         self.threadpool = QtCore.QThreadPool()	
@@ -252,33 +280,32 @@ class PloterMpl(QtWidgets.QMainWindow):
         #Filtragem 
         self.filtro = Filter(500, 2000, self.samp_rate)
 
-        
-
-
         QtWidgets.QMainWindow.__init__(self)
         self.resize(1024, 600)
         self.ui = uic.loadUi('main.ui', self)
 
-        self.ui.gridLayout_3.addWidget(self.canvas, 0, 1, 2, 1)
+        self.ui.gridLayout_3.addWidget(self.canvas1, 0, 1, 2, 1)
         self.ui.gridLayout.addWidget(self.canvas2, 0, 1, 2, 1)
         
-        #test sliders
-
-        
+        #init sliders
         val_pb = self.sliderPB.value()
         self.lab_PB.setText(str(val_pb))
         val_pa = self.sliderPB.value()
         self.lab_PA.setText(str(val_pa))
         val_nt = self.sliderPB.value()
         self.lab_NT.setText(str(val_nt))
-        #timer for update plt
+        #timer for update SVM
         self.timer = QtCore.QTimer()
         self.timer.setInterval(self.interval)
         self.timer.timeout.connect(self.update_system)
         self.timer.start()
         
-        self.p = pyaudio.PyAudio()
+        self.player = Player()
         
+        self.ch_selected = 1
+        self.canvas1.mouseReleaseEvent =  lambda x:self.select_ch1()
+        self.canvas2.mouseReleaseEvent =   lambda x:self.select_ch2()
+
         self.sliderPB.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         self.sliderPA.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         self.sliderNT.sliderReleased.connect(lambda: self.set_flag("filter_now"))
@@ -297,13 +324,23 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.clearButton.setEnabled(True)
         self.groupBox_2.setChecked(False)
         
-        #self.pushButton_9.clicked.connect(lambda: self.set_flag("filter_now"))
         self.worker = None
-        flags_status["setup_end"] = True
+        self.set_flag("setup_end") 
         print('Setup ok')
-   
+    
+    def select_ch1(self): 
+        self.ch_selected = 1
+        print("canal 1 selecionado")   
+    def select_ch2(self): 
+        self.ch_selected = 2
+        print("canal 2 selecionado")   
+        
+    
     def set_flag(self, flag):
-        flags_status[flag] = True
+        if  flags_status[flag]:
+            pass
+        else:
+            flags_status[flag] = True
 
     def state_machine_run(self, current_state):
         for i in range (len(struct_state_machine[current_state])): # Percorre lista de flags de current_state 
@@ -327,139 +364,113 @@ class PloterMpl(QtWidgets.QMainWindow):
         self.timer.setInterval(self.interval) 
         self.call_play_td = False # for don't call PLAY thread again 
 
-    def start_rec_play(self):
-        try:
-            #process all events
-            QtWidgets.QApplication.processEvents()
-            #define callback and stream
-            def callback(in_data, frame_count, time_info, status):
-                self.put_list((np.frombuffer(in_data, dtype=np.int16)))
-                return (in_data, pyaudio.paContinue)
-
-            self.stream = self.p.open(format=self.p.get_format_from_width(self.WIDTH),
-                                    channels=self.CHANNELS,
-                                    rate=self.RATE,
-                                    input=True,
-                                    output=True,
-                                    frames_per_buffer = 1000,
-                                    stream_callback=callback)
-            
-            self.stream.start_stream()
-
-            while self.stream.is_active():
-                    QtWidgets.QApplication.processEvents()
-                    self.gravar()
-                    if self.current_state != "GRAVANDO":
-                        print("stoping streaming")
-                        break
-
-            print("exiting streaming audio")
-            self.stream.stop_stream()
-            self.stream.close()
-            self.end_rec()
-            #self.p.terminate()	
-        except Exception as e:
-            print("ERROR: pyaudio ",e)
-            pass
-
-    def end_rec(self):
-        try:
-            self.canvas.plot_signal(self.registrador.get_audio_signal_np())
-        except Exception as e: 
-            print(e)
-   
     def update_system(self):
+
+           try:
+               #print('ACTIVE THREADS:',self.threadpool.activeThreadCount(),end=" \r")
+               while True:
+
+                   QtWidgets.QApplication.processEvents()
+                   self.current_state = self.state_machine_run(self.current_state)
+                   if self.current_state == "GRAVANDO": 
+                       if self.call_rec_td: 
+                           self.recButton.setEnabled(False)
+                           self.playButton.setEnabled(False)
+                           self.stopButton.setEnabled(True)
+                           self.pauseButton.setEnabled(False)
+                           self.clearButton.setEnabled(False)
+                           self.groupBox_2.setChecked(False)
+                           self.start_worker()
+
+
+                   elif self.current_state == "FILTRANDO":
+                      # self.print_log("filtrando")
+                       self.filtrar()
+                   elif self.current_state == "SALVANDO": 
+                       #self.print_log("salvando")
+                       self.salvar
+                   elif self.current_state == "CARREGANDO":
+                      # self.print_log("carregando")
+                       pass
+                   elif self.current_state == "CLEARING":
+                      # self.print_log("clearing all")
+                       self.clear_all()
+                   elif self.current_state == "REPRODUZINDO":
+                      if self.call_play_td: 
+                           self.recButton.setEnabled(False)
+                           self.playButton.setEnabled(False)
+                           self.stopButton.setEnabled(True)
+                           self.pauseButton.setEnabled(True)
+                           self.clearButton.setEnabled(False)
+                           self.groupBox_2.setChecked(False)
+                           self.start_worker2()
+
+                   elif self.current_state == "ESPERANDO":
+                      # self.print_log("esperando...")
+                       if self.call_rec_td == False: 
+                           self.recButton.setEnabled(True)
+                           self.playButton.setEnabled(True)
+                           self.stopButton.setEnabled(False)
+                           self.pauseButton.setEnabled(False)
+                           self.clearButton.setEnabled(True)
+                           self.groupBox_2.setChecked(True)
+                           self.call_rec_td = True 
+                       if self.call_play_td == False: 
+                           self.recButton.setEnabled(True)
+                           self.playButton.setEnabled(True)
+                           self.stopButton.setEnabled(False)
+                           self.pauseButton.setEnabled(False)
+                           self.clearButton.setEnabled(True)
+                           self.groupBox_2.setChecked(True)
+                           self.call_play_td = True    
+                   else:                   
+                       pass
+           except Exception as e:
+               print("Error: state swich",e)
+
+    def start_rec_play(self):
+        QtWidgets.QApplication.processEvents()
+        end_time = 10*8000
+        current_time = 0
+        self.player.open_stream()
+        while current_time < end_time :
+            print(current_time)
+            data, current_time = self.player.rec()
+            self.q.put((np.frombuffer(data, dtype=np.int16)))
+            self.plot_rec()
+            if self.current_state != "GRAVANDO":
+                    print("stoping streaming")
+                    break
+            QtWidgets.QApplication.processEvents()
+                    
+        print("exiting streaming audio")
+        self.player.stop()
+        self.registrador.set_signal_to_play(1)
+        self.end_rec()
+    
+    def start_play(self): 
+         QtWidgets.QApplication.processEvents()
+         self.select_track_channel(self.ch_selected)
+         data = self.registrador.get_signal_to_play()
+         end_time = len(data) ##
+         current_time = 0
+         
+         self.player.open_stream()
         
-        try:
-            #print('ACTIVE THREADS:',self.threadpool.activeThreadCount(),end=" \r")
-            while True:
-                
-                QtWidgets.QApplication.processEvents()
-                self.current_state = self.state_machine_run(self.current_state)
-                
-                if self.current_state == "GRAVANDO": 
-                    if self.call_rec_td: 
-                        self.recButton.setEnabled(False)
-                        self.playButton.setEnabled(False)
-                        self.stopButton.setEnabled(True)
-                        self.pauseButton.setEnabled(False)
-                        self.clearButton.setEnabled(False)
-                        self.groupBox_2.setChecked(False)
-                        self.start_worker()
-                
-                elif self.current_state == "FILTRANDO":
-                   # self.print_log("filtrando")
-                    self.filtrar()
-                elif self.current_state == "SALVANDO": 
-                    #self.print_log("salvando")
-                    self.salvar
-                elif self.current_state == "CARREGANDO":
-                   # self.print_log("carregando")
-                    pass
-                elif self.current_state == "CLEARING":
-                   # self.print_log("clearing all")
-                    self.clear_all()
-                elif self.current_state == "REPRODUZINDO":
-                   if self.call_play_td: 
-                        self.recButton.setEnabled(False)
-                        self.playButton.setEnabled(False)
-                        self.stopButton.setEnabled(True)
-                        self.pauseButton.setEnabled(True)
-                        self.clearButton.setEnabled(False)
-                        self.groupBox_2.setChecked(False)
-                        self.start_worker2()
-
-                elif self.current_state == "ESPERANDO":
-                   # self.print_log("esperando...")
-                    if self.call_rec_td == False: 
-                        self.recButton.setEnabled(True)
-                        self.playButton.setEnabled(True)
-                        self.stopButton.setEnabled(False)
-                        self.pauseButton.setEnabled(False)
-                        self.clearButton.setEnabled(True)
-                        self.groupBox_2.setChecked(True)
-                        self.call_rec_td = True 
-                    if self.call_play_td == False: 
-                        self.recButton.setEnabled(True)
-                        self.playButton.setEnabled(True)
-                        self.stopButton.setEnabled(False)
-                        self.pauseButton.setEnabled(False)
-                        self.clearButton.setEnabled(True)
-                        self.groupBox_2.setChecked(True)
-                        self.call_play_td = True    
-                else:                   
-                    pass
-        except Exception as e:
-            print("Error: state swich",e)
-        
-
-    def get_list(self):  
-        data = self.q.get_nowait() 
-        return data
-
-    def put_list(self, thing):
-        self.q.put(thing)
+         while(current_time < end_time):
+             current_time = self.player.play_frame(data)
+             data = data[1000:]
+             current_time = current_time + 1000
+             self.track_channel[self.ch_selected - 1].plot_mark_time(current_time/8000)
+             if self.current_state != "REPRODUZINDO":
+                 break
+         self.player.stop()
+         self.set_flag("wait_now")
 
     def clear_all(self): 
-        self.canvas.clear_plot
+        self.canvas1.clear_plot
         self.registrador.clear_memory
         sys.exit(app.exec_())
-
-    def gravar(self): 
-        try:
-            while True:
-                QtWidgets.QApplication.processEvents()
-                try: 
-                    data_list = self.q.get_nowait()
-                    data = np.array(data_list)/32768
-                except queue.Empty:
-            
-                    break
-                self.canvas.plot_real_time(data)
-                self.registrador.extend_signal(data_list)
-            
-        except Exception as e:
-            print("Error 'gravando':",e)
 
     def filtrar(self):
         try:
@@ -470,8 +481,7 @@ class PloterMpl(QtWidgets.QMainWindow):
             self.lab_PB.setText(str(fc_PB))
             self.lab_PA.setText(str(fc_PA))
             self.lab_NT.setText(str(fc_NT))
-            print("filtrando o sinal...")
-            sinal = self.registrador.get_audio_signal_np()
+            sinal = self.registrador.get_signal_norm()
             
             sinal_f = self.filter_serie(sinal, fs, fc_PB, fc_PA, fc_NT)
             
@@ -497,7 +507,6 @@ class PloterMpl(QtWidgets.QMainWindow):
         
         b, a = self.notch_filter(f0, Q, fs)
         self.registrador.set_filters_memorized((b,a), filter = "NT")
-        print("1")
         zi = lfilter_zi(b, a)
         print(zi)
         y,zo = lfilter(b, a, data, zi=zi*data[0])
@@ -530,61 +539,62 @@ class PloterMpl(QtWidgets.QMainWindow):
         return b,a
 #############################################################
     
+    def plot_rec(self): 
+       try:
+           while True:
+               QtWidgets.QApplication.processEvents()
+               try: 
+                   data_list = self.q.get_nowait()
+                   data = np.array(data_list)/32768
+               except queue.Empty:
+           
+                   break
+               self.canvas1.plot_real_time(data)
+               self.registrador.extend_signal(data_list)
+           
+       except Exception as e:
+           print("Error 'gravando':",e)
     
-    def start_play(self): 
-
-        stream = self.p.open(format = pyaudio.paFloat32,
-                channels = 1,
-                frames_per_buffer = 1000,
-                rate = 8000,
-                output = True)
-        
-        data = self.registrador.get_audio_signal_np()
-        i = 0
+    def end_rec(self):
+        try:
+            self.canvas1.plot_signal(self.registrador.get_signal_norm())
+        except Exception as e: 
+            print(e)
+    
+    def end_play(self, i):
+        self.recButton.setEnabled(True)
+        self.playButton.setEnabled(True)
+        self.stopButton.setEnabled(False)
+        self.pauseButton.setEnabled(False)
+        self.clearButton.setEnabled(True)
+        self.groupBox_2.setChecked(True)
         self.registrador.set_time_player(i)
-        while stream.is_active():
-            if self.current_state != "REPRODUZINDO" or len(data) < 1000:
-                self.registrador.set_time_player(0)
-                self.canvas.plot_mark_time(self.registrador.get_time_player())
-                break
-            stream.write(data.astype(np.float32).tostring(), 1000)
-            data = data[1000:]
-            i = i + 1000
-            self.registrador.set_time_player(i)
-            self.canvas.plot_mark_time(self.registrador.get_time_player())
-        
-        stream.stop_stream()
-        stream.close()
-        self.set_flag("wait_now")
-    
-    def pausar(): 
-        pass
 
     def salvar(self): 
         self.registrador.save_wav()
-        pass
         
     def switch_freq_time(self):
         try:
-            y = self.registrador.get_audio_signal_np()
-            yf = self.registrador.get_audio_signal_filt_np()
+            y = self.registrador.get_signal_norm()
+            yf = self.registrador.get_signal_filt_norm()
             if self.ui.freqtime_toggButon.isChecked(): 
-                self.canvas.freq_dom = True
-                self.canvas.plot_signal(y)
+                self.canvas1.freq_dom = True
+                self.canvas1.plot_signal(y)
                 self.canvas2.freq_dom = True
                 self.canvas2.plot_signal(yf)
             else:
-                self.canvas.freq_dom = False
-                self.canvas.plot_signal(y)
+                self.canvas1.freq_dom = False
+                self.canvas1.plot_signal(y)
                 self.canvas2.freq_dom = False
                 self.canvas2.plot_signal(yf)
         except: 
             print("sem todos os dados necessários")
             pass
 
+    def select_track_channel(self, ch): 
+        self.registrador.set_signal_to_play(ch)
 
 class Worker(QtCore.QRunnable):
-
 	def __init__(self, function, *args, **kwargs):
 		super(Worker, self).__init__()
 		self.function = function
@@ -597,7 +607,7 @@ class Worker(QtCore.QRunnable):
 		self.function(*self.args, **self.kwargs)
 
 app = QtWidgets.QApplication(sys.argv)
-MainWindow  = PloterMpl()
+MainWindow  = MainApp()
 MainWindow.show()
 sys.exit(app.exec_())
 
