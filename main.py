@@ -307,31 +307,37 @@ class Filter():
         return b, a
     
 class MainApp(QtWidgets.QMainWindow):
-    WIDTH = 2
-    CHANNELS = 1
-    RATE = 8000
-    
-    def __init__(self):
 
+    def __init__(self):
+        #Estado 0
         self.current_state = "INICIO"
-        #Flags
-        self.call_rec_td = False
-        self.call_play_td = False
+
         #plot props
         self.samp_rate = 8000
-        
-        self.canvas1 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
-        self.canvas2 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
-        self.track_channel = [self.canvas1, self.canvas2]
-
         self.interval = 30
-        #define new Qthread for pyaudio
+
+        #init manipulador de threads
         self.threadpool = QtCore.QThreadPool()	
         self.threadpool.setMaxThreadCount(1)
 
+        #Flags de controle das Threads
+        self.call_rec_td = False
+        self.call_play_td = False
+
+        #init GUI
+        QtWidgets.QMainWindow.__init__(self)
+        self.resize(1024, 600)
+        self.ui = uic.loadUi('main.ui', self)
+
+        #Plotters 
+        self.canvas1 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
+        self.canvas2 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
+        self.track_channel = [self.canvas1, self.canvas2]
+        self.ui.gridLayout_3.addWidget(self.canvas1, 0, 1, 2, 1)
+        self.ui.gridLayout.addWidget(self.canvas2, 0, 1, 2, 1)
+
         #buffer
         self.q = queue.Queue()
-        self.plot_now = False
         
         #Armazenamento
         self.registrador = Registrador(self.samp_rate)
@@ -339,12 +345,8 @@ class MainApp(QtWidgets.QMainWindow):
         #Filtragem 
         self.filtros = Filter(self.samp_rate)
 
-        QtWidgets.QMainWindow.__init__(self)
-        self.resize(1024, 600)
-        self.ui = uic.loadUi('main.ui', self)
-
-        self.ui.gridLayout_3.addWidget(self.canvas1, 0, 1, 2, 1)
-        self.ui.gridLayout.addWidget(self.canvas2, 0, 1, 2, 1)
+        #Audio I/O
+        self.player = Player()
         
         #init sliders
         val_pb = self.sliderPB.value()
@@ -353,22 +355,22 @@ class MainApp(QtWidgets.QMainWindow):
         self.lab_PA.setText(str(val_pa))
         val_nt = self.sliderPB.value()
         self.lab_NT.setText(str(val_nt))
+
         #timer for update SVM
         self.timer = QtCore.QTimer()
         self.timer.setInterval(self.interval)
         self.timer.timeout.connect(self.update_system)
         self.timer.start()
         
-        self.player = Player()
-        
-        self.ch_selected = 1
+        #Eventos de seleção do canal com o clique do mouse
         self.canvas1.mouseReleaseEvent =  lambda x:self.select_ch1()
         self.canvas2.mouseReleaseEvent =   lambda x:self.select_ch2()
 
+        #conexão dos sinais de entrada
         self.sliderPB.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         self.sliderPA.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         self.sliderNT.sliderReleased.connect(lambda: self.set_flag("filter_now"))
-
+        # Botões
         self.recButton.clicked.connect(lambda: self.set_flag ("rec_now"))
         self.playButton.clicked.connect(lambda: self.set_flag ("play_now"))
         self.stopButton.clicked.connect(lambda: self.set_flag("wait_now"))
@@ -376,6 +378,7 @@ class MainApp(QtWidgets.QMainWindow):
         self.clearButton.clicked.connect(lambda: self.set_flag("clear_now"))
         self.freqtime_toggButon.clicked.connect(lambda: self.switch_freq_time())
         
+        # Desativa/Ativa botões 
         self.recButton.setEnabled(True)
         self.playButton.setEnabled(False)
         self.stopButton.setEnabled(False)
@@ -383,7 +386,9 @@ class MainApp(QtWidgets.QMainWindow):
         self.clearButton.setEnabled(True)
         self.groupBox_2.setChecked(False)
         
+        #setup inicial: canal 1 selecionado
         self.worker = None
+        self.ch_selected = 1
         self.set_flag("setup_end") 
         print('Setup ok')
     
@@ -394,7 +399,8 @@ class MainApp(QtWidgets.QMainWindow):
     def select_ch2(self): 
         self.ch_selected = 2
         print("canal 2 selecionado")   
-           
+
+    #Altera a lista de flgs de entrada da maquina de estado       
     def set_flag(self, flag):
         if  flags_status[flag]:
             pass
@@ -408,29 +414,34 @@ class MainApp(QtWidgets.QMainWindow):
                 current_state = struct_state_machine[current_state][i][1] # current_state = "next_state(flag = true)"
                 break
         return current_state # Retorna o Próximo Estado (next_state ou current_state)
-        
+    
+    #Inicializa Thread para gravação
     def start_worker(self):
         print("instanciando worker...")
         self.worker = Worker(self.start_rec_play, )
         self.threadpool.start(self.worker)	
         self.timer.setInterval(self.interval) 
-        self.call_rec_td = False # for don't call REC thread again 
-
+        self.call_rec_td = False 
+    
+    #Inicializa Thread para reprodução
     def start_worker2(self):
         print("instanciando worker 2...")
         self.worker = Worker(self.start_play, )
         self.threadpool.start(self.worker)	
         self.timer.setInterval(self.interval) 
-        self.call_play_td = False # for don't call PLAY thread again 
+        self.call_play_td = False 
 
+    #Loop principal onde e alterado o estado atual do sistema
     def update_system(self):
 
            try:
                print('ACTIVE THREADS:',self.threadpool.activeThreadCount(),end=" \r")
                while True:
-
                    QtWidgets.QApplication.processEvents()
+                   
+                   #estado[i - 1] = estado [i]
                    self.current_state = self.state_machine_run(self.current_state)
+
                    if self.current_state == "GRAVANDO": 
                        if self.call_rec_td: 
                            self.recButton.setEnabled(False)
@@ -464,9 +475,8 @@ class MainApp(QtWidgets.QMainWindow):
                            self.groupBox_2.setChecked(False)
                            self.start_worker2()
 
-
+                   # Na maior parte do tempo de execução o estado do sistema estará aqui
                    elif self.current_state == "ESPERANDO":
-                      # self.print_log("esperando...")
                        if self.call_rec_td == False: 
                            self.recButton.setEnabled(True)
                            self.playButton.setEnabled(True)
@@ -475,6 +485,7 @@ class MainApp(QtWidgets.QMainWindow):
                            self.clearButton.setEnabled(True)
                            self.groupBox_2.setChecked(True)
                            self.call_rec_td = True 
+
                        if self.call_play_td == False: 
                            self.recButton.setEnabled(True)
                            self.playButton.setEnabled(True)
@@ -528,8 +539,7 @@ class MainApp(QtWidgets.QMainWindow):
                  break
          self.player.stop()
          print(self.current_state)
-         
-
+        
     def clear_all(self): 
         self.canvas1.clear_plot
         self.registrador.clear_memory
@@ -580,6 +590,7 @@ class MainApp(QtWidgets.QMainWindow):
         except Exception as e: 
             print(e)
     
+    #não usadas por enquanto
     def end_play(self, i):
         self.recButton.setEnabled(True)
         self.playButton.setEnabled(True)
@@ -591,7 +602,8 @@ class MainApp(QtWidgets.QMainWindow):
 
     def salvar(self): 
         self.registrador.save_wav()
-        
+
+    #alterna o domínio dos graficos dos canais (tempo/frequencia) 
     def switch_freq_time(self):
         try:
             y = self.registrador.get_signal_norm()
@@ -610,6 +622,7 @@ class MainApp(QtWidgets.QMainWindow):
             print("sem todos os dados necessários")
             pass
 
+    #seleciona o canal ativo para reproduzir 
     def select_track_channel(self, ch): 
         self.registrador.set_signal_to_play(ch)
 
