@@ -5,16 +5,11 @@
 #Conrado/Tarsis
 
 #bibliotecas essenciais 
-from PyQt5.QtGui import QDragEnterEvent, QDragMoveEvent
-from matplotlib.backend_bases import Event
+from matplotlib.backend_bases import Event, MouseEvent
 import matplotlib.pyplot as plt
 import sys 
-import matplotlib
-from numpy.lib.financial import rate 
+import matplotlib 
 matplotlib.use('Qt5Agg')
-
-
-import matplotlib.ticker as ticker
 import numpy as np
 from PyQt5.QtCore import QEvent, pyqtSlot
 from PyQt5 import QtCore, QtWidgets
@@ -35,10 +30,16 @@ struct_state_machine = {"INICIO":[("setup_end","ESPERANDO")], "ESPERANDO":[("rec
 #Dictionary with the state of all flags of the system
 flags_status = {"setup_end":False, "rec_now":False, "rec_end":False, "filter_now":False, "save_now":False, "open_now":False, "clear_now":False, "play_now":False, "pause_now":False, "wait_now":False}
 
-
 from scipy.fft import fft, fftfreq
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
+class WindowDialog(QtWidgets.QDialog): 
+    def __init__(self):
+        self.resize(1024, 600)
+        super(WindowDialog, self).__init__()
+
+
 class Ploter (FigureCanvas):
     
     def __init__(self,obj, samp_rate, parent=None, width=5, height=4, dpi=100 ):
@@ -107,15 +108,24 @@ class Ploter (FigureCanvas):
         self.clear_plot()
         N = len(data)
         yf_freq, xf_freq = self.fft_transf(data, N, self.samp_step )
+        self.axes.set_ylim( ymin=0, ymax=0.01)
         self.axes.plot(xf_freq, 2.0/N * np.abs(yf_freq[0:N//2]))
         self.axes.grid()
         self.draw()
 
+    def mousePressEvent(self, event):
+        print(event.x(),event.y())
+        
+       
+    def mouseMoveEvent(self, event):
+        return super().mouseMoveEvent(event)
+
     def clear_plot(self): #Não testado
         self.axes.clear()
-        self.draw
-        pass
-               
+        self.draw()
+        
+from tkinter import filedialog
+from tkinter.filedialog import asksaveasfilename      
 import soundfile as sf
 class Registrador(): 
     def __init__(self, samp_rate):
@@ -174,17 +184,25 @@ class Registrador():
         self.time_player = time/self.samp_rate
 
     def save_wav(self): 
-        sf.write('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24') 
-        sf.write('audio_f_file.wav', self.audio_f_memorized, self.samp_rate, 'PCM_24') 
-        '''
-        if(self.audio_f_memorized == []):
-            pass
-        else:
-            sf.write('audio_f_file.wav', self.audio_f_memorized, self.samp_rate, 'PCM_24') 
-        '''
-    
+        try:
+            self.filename = asksaveasfilename(initialdir="/", title="Save as",
+                filetypes=(("audio file", "*.wav"), ("all files", "*.*")),
+                defaultextension=".wav")
+            #save stream as .wav file
+            sf.write(self.filename, self.audio_memorized, self.samp_rate, 'PCM_24') 
+        except:
+            print("nenhum sinal de audio armazenado no sistema")
+            
     def load_wav(self): 
-        self.audio_memorized = sf.read('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24')       
+        _audio_file = filedialog.askopenfilename(initialdir="desktop/", title="Escolha um Arquivo", filetypes=(("wav files", "*.wav"),("all files", "*.*")))
+        #self.audio_memorized = sf.read('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24')       
+        filename = _audio_file
+        self.data, self.fs = sf.read(filename, dtype=np.int16) 
+        #sd.play(self.data, self.fs) 
+        #self.duration = len(self.data)/self.fs
+        #self.time = np.arange (0, self.duration , 1/self.fs)
+    
+        self.audio_memorized = np.array(self.data)     
     
     def clear_memory(self): #Não testado
         self.audio_memorized = [] 
@@ -235,7 +253,7 @@ class Filter():
         self.PA_pars = {"btype":"high", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10 } 
         self.PB_pars = {"btype":"low", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10 } 
         self.PNT_pars = {"fc":60, "q":10.0} 
-    
+
     def set_PB_fc(self,fc):
         self.PB_pars["fc"] = fc
     
@@ -309,8 +327,17 @@ class Filter():
 class MainApp(QtWidgets.QMainWindow):
 
     def __init__(self):
+        self.estate_key={"GRAVANDO":self.gravando,"FILTRANDO":self.filtrando,"SALVANDO":self.salvando,
+                            "CARREGANDO":self.carregando, "CLEARING":self.clearing, "REPRODUZINDO":self.reproduzindo,
+                            "ESPERANDO":self.esperando}
+      
         #Estado 0
         self.current_state = "INICIO"
+
+        #init GUI
+        QtWidgets.QMainWindow.__init__(self)
+        self.resize(1024, 600)
+        self.ui = uic.loadUi('main.ui', self)
 
         #plot props
         self.samp_rate = 8000
@@ -323,11 +350,6 @@ class MainApp(QtWidgets.QMainWindow):
         #Flags de controle das Threads
         self.call_rec_td = False
         self.call_play_td = False
-
-        #init GUI
-        QtWidgets.QMainWindow.__init__(self)
-        self.resize(1024, 600)
-        self.ui = uic.loadUi('main.ui', self)
 
         #Plotters 
         self.canvas1 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
@@ -371,13 +393,20 @@ class MainApp(QtWidgets.QMainWindow):
         self.sliderPA.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         self.sliderNT.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         # Botões
+        self.actionOriginal_Sound.triggered.connect(lambda: self.set_flag("save_now"))
+        self.actionOpen.triggered.connect(lambda: self.set_flag("open_now"))
+
         self.recButton.clicked.connect(lambda: self.set_flag ("rec_now"))
         self.playButton.clicked.connect(lambda: self.set_flag ("play_now"))
         self.stopButton.clicked.connect(lambda: self.set_flag("wait_now"))
         self.pauseButton.clicked.connect(lambda: self.set_flag("pause_now"))
         self.clearButton.clicked.connect(lambda: self.set_flag("clear_now"))
-        self.freqtime_toggButon.clicked.connect(lambda: self.switch_freq_time())
         
+        self.exitButton.clicked.connect(lambda: self.exit())
+        self.freqtime_toggButon.clicked.connect(lambda: self.switch_freq_time())
+        self.refreshButton.clicked.connect(lambda: self.refresh_adv_pars())
+        self.adv_pars_Buton.clicked.connect(lambda: self.hide_show_adv_menu())
+
         # Desativa/Ativa botões 
         self.recButton.setEnabled(True)
         self.playButton.setEnabled(False)
@@ -386,17 +415,70 @@ class MainApp(QtWidgets.QMainWindow):
         self.clearButton.setEnabled(True)
         self.groupBox_2.setChecked(False)
         
+        self.ui.adv_pars_Box.hide()
         #setup inicial: canal 1 selecionado
         self.worker = None
         self.ch_selected = 1
         self.set_flag("setup_end") 
         print('Setup ok')
     
-    def select_ch1(self): 
+    def refresh_adv_pars(self):
+        typefPA = self.ui.comboBox_tipoPA.currentText()
+        typefPB = self.ui.comboBox_tipoPB.currentText()
+        self.filtros.PA_pars['ftype'] = typefPA
+        self.filtros.PB_pars['ftype'] = typefPB
+        self.set_flag("wait_now")
+        print(typefPA,typefPB)
+
+    def hide_show_adv_menu(self):
+        if self.ui.adv_pars_Buton.isChecked(): 
+            self.ui.adv_pars_Box.show()
+        else: 
+            self.ui.adv_pars_Box.hide()
+        
+
+    def select_ch1(self):
+        
+        self.ui.ch1.setStyleSheet("QGroupBox"
+                                     "{"
+                                     "border : 2px solid black;"
+                                     "}"
+                                     "QGroupBox::editable:on"
+                                     "{"
+                                     "border : 2px solid;"
+                                     "border-color : red green blue yellow"
+                                     "}")
+        self.ui.ch2.setStyleSheet("QGroupBox"
+                                     "{"
+                                     "border : 0px solid black;"
+                                     "}"
+                                     "QGroupBox::editable:on"
+                                     "{"
+                                     "border : 0px solid;"
+                                     "border-color : red green blue yellow"
+                                     "}")
         self.ch_selected = 1
         print("canal 1 selecionado")   
     
     def select_ch2(self): 
+        self.ui.ch2.setStyleSheet("QGroupBox"
+                                     "{"
+                                     "border : 2px solid black;"
+                                     "}"
+                                     "QGroupBox::editable:on"
+                                     "{"
+                                     "border : 2px solid;"
+                                     "border-color : red green blue yellow"
+                                     "}")
+        self.ui.ch1.setStyleSheet("QGroupBox"
+                                     "{"
+                                     "border : 0px solid black;"
+                                     "}"
+                                     "QGroupBox::editable:on"
+                                     "{"
+                                     "border : 0px solid;"
+                                     "border-color : red green blue yellow"
+                                     "}")
         self.ch_selected = 2
         print("canal 2 selecionado")   
 
@@ -433,84 +515,84 @@ class MainApp(QtWidgets.QMainWindow):
 
     #Loop principal onde e alterado o estado atual do sistema
     def update_system(self):
-
            try:
                print('ACTIVE THREADS:',self.threadpool.activeThreadCount(),end=" \r")
                while True:
                    QtWidgets.QApplication.processEvents()
-                   
                    #estado[i - 1] = estado [i]
                    self.current_state = self.state_machine_run(self.current_state)
-
-                   if self.current_state == "GRAVANDO": 
-                       if self.call_rec_td: 
-                           self.recButton.setEnabled(False)
-                           self.playButton.setEnabled(False)
-                           self.stopButton.setEnabled(True)
-                           self.pauseButton.setEnabled(False)
-                           self.clearButton.setEnabled(False)
-                           self.groupBox_2.setChecked(False)
-                           self.start_worker()
-
-
-                   elif self.current_state == "FILTRANDO":
-                      # self.print_log("filtrando")
-                       self.filtrar()
-                   elif self.current_state == "SALVANDO": 
-                       #self.print_log("salvando")
-                       self.salvar
-                   elif self.current_state == "CARREGANDO":
-                      # self.print_log("carregando")
-                       pass
-                   elif self.current_state == "CLEARING":
-                      # self.print_log("clearing all")
-                       self.clear_all()
-                   elif self.current_state == "REPRODUZINDO":
-                      if self.call_play_td: 
-                           self.recButton.setEnabled(False)
-                           self.playButton.setEnabled(False)
-                           self.stopButton.setEnabled(True)
-                           self.pauseButton.setEnabled(True)
-                           self.clearButton.setEnabled(False)
-                           self.groupBox_2.setChecked(False)
-                           self.start_worker2()
-
-                   # Na maior parte do tempo de execução o estado do sistema estará aqui
-                   elif self.current_state == "ESPERANDO":
-                       if self.call_rec_td == False: 
-                           self.recButton.setEnabled(True)
-                           self.playButton.setEnabled(True)
-                           self.stopButton.setEnabled(False)
-                           self.pauseButton.setEnabled(False)
-                           self.clearButton.setEnabled(True)
-                           self.groupBox_2.setChecked(True)
-                           self.call_rec_td = True 
-
-                       if self.call_play_td == False: 
-                           self.recButton.setEnabled(True)
-                           self.playButton.setEnabled(True)
-                           self.stopButton.setEnabled(False)
-                           self.pauseButton.setEnabled(False)
-                           self.clearButton.setEnabled(True)
-                           self.groupBox_2.setChecked(True)
-                           self.call_play_td = True    
-                   else:                   
-                       pass
+                   
+                   self.estate_key[self.current_state]()
            except Exception as e:
                print("Error: state swich",e)
+##########################################################
+    def gravando(self):
+       if self.call_rec_td: 
+           self.recButton.setEnabled(False)
+           self.playButton.setEnabled(False)
+           self.stopButton.setEnabled(True)
+           self.pauseButton.setEnabled(False)
+           self.clearButton.setEnabled(False)
+           self.groupBox_2.setChecked(False)
+           self.start_worker() 
+       else:
+            pass   
+    
+    def filtrando(self):
+        self.filtrar()    
+    
+    def salvando(self):
+       self.salvar()   
+    
+    def carregando(self):
+       self.load_audio()   
+    
+    def clearing(self):
+       self.clear_all()
 
+    def reproduzindo(self):
+       if self.call_play_td: 
+           self.recButton.setEnabled(False)
+           self.playButton.setEnabled(False)
+           self.stopButton.setEnabled(True)
+           self.pauseButton.setEnabled(True)
+           self.clearButton.setEnabled(False)
+           self.groupBox_2.setChecked(False)
+           self.start_worker2()
+       else: 
+           pass
+    
+    def esperando(self):
+       if self.call_rec_td == False: 
+           self.recButton.setEnabled(True)
+           self.playButton.setEnabled(True)
+           self.stopButton.setEnabled(False)
+           self.pauseButton.setEnabled(False)
+           self.clearButton.setEnabled(True)
+           self.groupBox_2.setChecked(True)
+           self.call_rec_td = True
+       if self.call_play_td == False: 
+           self.recButton.setEnabled(True)
+           self.playButton.setEnabled(True)
+           self.stopButton.setEnabled(False)
+           self.pauseButton.setEnabled(False)
+           self.clearButton.setEnabled(True)
+           self.groupBox_2.setChecked(True)
+           self.call_play_td = True    
+##########################################################
     def start_rec_play(self):
         QtWidgets.QApplication.processEvents()
         end_time = 10*8000
         current_time = 0
         self.player.open_stream()
-        while current_time < end_time :
+        while self.current_state == "GRAVANDO":
             print(current_time)
             data, current_time = self.player.rec()
             self.q.put((np.frombuffer(data, dtype=np.int16)))
             self.plot_rec()
-            if self.current_state != "GRAVANDO":
-                    print("stoping streaming")
+            if current_time > end_time :
+                    print("end streaming")
+                    self.set_flag('wait_now')
                     break
             QtWidgets.QApplication.processEvents()
                     
@@ -541,18 +623,17 @@ class MainApp(QtWidgets.QMainWindow):
          print(self.current_state)
         
     def clear_all(self): 
-        self.canvas1.clear_plot
-        self.registrador.clear_memory
+        self.track_channel[self.ch_selected - 1].clear_plot()
+        self.registrador.clear_memory()
+        
+    def exit(self):
         sys.exit(app.exec_())
-
     def filtrar(self):
         try:
             fc_PB = self.sliderPB.value()
             fc_PA = self.sliderPA.value()
             fc_NT = self.sliderNT.value()
-            self.lab_PB.setText(str(fc_PB))
-            self.lab_PA.setText(str(fc_PA))
-            self.lab_NT.setText(str(fc_NT))
+
             sinal = self.registrador.get_signal_norm()
             
             self.filtros.set_PB_fc(fc=fc_PB)
@@ -567,6 +648,7 @@ class MainApp(QtWidgets.QMainWindow):
             self.set_flag("wait_now")
         except Exception as e:
             print("Erro ao filtrar:",e)
+            self.set_flag("wait_now")
     
     def plot_rec(self): 
        try:
@@ -602,7 +684,13 @@ class MainApp(QtWidgets.QMainWindow):
 
     def salvar(self): 
         self.registrador.save_wav()
-
+        self.set_flag("wait_now")
+    
+    def load_audio(self):
+        self.actionOpen.setEnabled(False)
+        self.registrador.load_wav()
+        self.canvas1.plot_signal(self.registrador.get_signal_norm())
+        self.set_flag("wait_now")
     #alterna o domínio dos graficos dos canais (tempo/frequencia) 
     def switch_freq_time(self):
         try:
@@ -625,6 +713,16 @@ class MainApp(QtWidgets.QMainWindow):
     #seleciona o canal ativo para reproduzir 
     def select_track_channel(self, ch): 
         self.registrador.set_signal_to_play(ch)
+
+    def open_adv_pars(self):
+
+        dlg = uic.loadUi('form.ui', self)
+      #  dlg.setWindowTitle("HELLO!")
+        dlg.show()
+
+class AdvancedOptions():
+    def __init__(self):
+        self.PA_pars = {"btype":"high", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10 }
 
 class Worker(QtCore.QRunnable):
 	def __init__(self, function, *args, **kwargs):
