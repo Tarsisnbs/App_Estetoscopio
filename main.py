@@ -15,7 +15,7 @@ from PyQt5.QtCore import QEvent, pyqtSlot
 from PyQt5 import QtCore, QtWidgets
 from PyQt5 import uic
 import queue 
-
+from tkinter import *
 import scipy.signal as signal
 from scipy.signal import butter, lfilter, lfilter_zi, freqs
 
@@ -31,15 +31,8 @@ struct_state_machine = {"INICIO":[("setup_end","ESPERANDO")], "ESPERANDO":[("rec
 flags_status = {"setup_end":False, "rec_now":False, "rec_end":False, "filter_now":False, "save_now":False, "open_now":False, "clear_now":False, "play_now":False, "pause_now":False, "wait_now":False}
 
 from scipy.fft import fft, fftfreq
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar 
 from matplotlib.figure import Figure
-
-class WindowDialog(QtWidgets.QDialog): 
-    def __init__(self):
-        self.resize(1024, 600)
-        super(WindowDialog, self).__init__()
-
-
 class Ploter (FigureCanvas):
     
     def __init__(self,obj, samp_rate, parent=None, width=5, height=4, dpi=100 ):
@@ -56,7 +49,7 @@ class Ploter (FigureCanvas):
         self.x, self.y = self.init_plot_axis(self.window_t, self.samp_rate)
         self.axes.set_xlim(0, self.window_t)
         fig.tight_layout()
-    
+        toolbar = NavigationToolbar(self, self)
     def init_plot_axis(self, window_t, samp_rate):
         samp_step = 1/samp_rate
         window_s = window_t*samp_rate
@@ -112,19 +105,17 @@ class Ploter (FigureCanvas):
         self.axes.plot(xf_freq, 2.0/N * np.abs(yf_freq[0:N//2]))
         self.axes.grid()
         self.draw()
-
-    def mousePressEvent(self, event):
-        print(event.x(),event.y())
+    
+    def plot_wh(self,w_h):
+        self.axes.semilogx(w_h[0] / (2*np.pi), 20 * np.log10(np.maximum(abs(w_h[1]), 1e-5)))
+        self.draw()
         
-       
-    def mouseMoveEvent(self, event):
-        return super().mouseMoveEvent(event)
 
-    def clear_plot(self): #Não testado
+    def clear_plot(self): 
         self.axes.clear()
         self.draw()
         
-from tkinter import filedialog
+from tkinter import Scrollbar, filedialog
 from tkinter.filedialog import asksaveasfilename      
 import soundfile as sf
 class Registrador(): 
@@ -185,15 +176,20 @@ class Registrador():
 
     def save_wav(self): 
         try:
+            root = Tk()
+            root.withdraw()
             self.filename = asksaveasfilename(initialdir="/", title="Save as",
                 filetypes=(("audio file", "*.wav"), ("all files", "*.*")),
                 defaultextension=".wav")
             #save stream as .wav file
             sf.write(self.filename, self.audio_memorized, self.samp_rate, 'PCM_24') 
+            root.destroy()
         except:
             print("nenhum sinal de audio armazenado no sistema")
             
     def load_wav(self): 
+        root = Tk()
+        root.withdraw()
         _audio_file = filedialog.askopenfilename(initialdir="desktop/", title="Escolha um Arquivo", filetypes=(("wav files", "*.wav"),("all files", "*.*")))
         #self.audio_memorized = sf.read('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24')       
         filename = _audio_file
@@ -203,7 +199,7 @@ class Registrador():
         #self.time = np.arange (0, self.duration , 1/self.fs)
     
         self.audio_memorized = np.array(self.data)     
-    
+        root.destroy()
     def clear_memory(self): #Não testado
         self.audio_memorized = [] 
 
@@ -250,9 +246,9 @@ class Filter():
     def __init__(self, samp_rate):
         self.elip_filter = None
         self.fs = samp_rate 
-        self.PA_pars = {"btype":"high", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10 } 
-        self.PB_pars = {"btype":"low", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10 } 
-        self.PNT_pars = {"fc":60, "q":10.0} 
+        self.PA_pars = {"btype":"high", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10, "tf":()} 
+        self.PB_pars = {"btype":"low", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10, "tf":() } 
+        self.PNT_pars = {"fc":60, "q":10.0, "tf":()} 
 
     def set_PB_fc(self,fc):
         self.PB_pars["fc"] = fc
@@ -278,7 +274,7 @@ class Filter():
     def set_pars_NT(self, fc, q): 
         self.PNT_pars["fc"] = fc
         self.PNT_pars["q"] = q
-
+    
     def get_PA_pars(self):
         pars = [self.PA_pars["btype"],self.PA_pars["order"], self.PA_pars["ftype"], self.PA_pars["fc"],
             self.PA_pars["rp"], self.PA_pars["rs"]]
@@ -289,6 +285,15 @@ class Filter():
             self.PB_pars["rp"], self.PB_pars["rs"]]
         return pars
 
+    def get_w_h(self):
+        tfPB = self.PB_pars["tf"]
+        tfPA = self.PA_pars["tf"]
+        tfPNT = self.PNT_pars["tf"]
+        whPB = signal.freqz(tfPB[0], tfPB[1], fs= self.fs, worN= 40000)
+        whPA = signal.freqz(tfPA[0], tfPA[1], fs= self.fs, worN= 40000)
+        whPNT = signal.freqz(tfPNT[0], tfPNT[1], fs= self.fs, worN= 40000)
+        return whPB, whPA, whPNT
+    
     def filter_serie(self, data): 
         print("aplicando filtro serie")
         dataf1 = self.notch_filter_bandcut(data, self.PNT_pars["fc"], self.PNT_pars["q"], self.fs)
@@ -299,6 +304,7 @@ class Filter():
     
     def notch_filter_bandcut(self, data, f0, Q, fs):
         b, a = self.notch_filter(f0, Q, fs)
+        self.PNT_pars["tf"] = (b,a)
         zi = lfilter_zi(b, a)
         print(zi)
         y,zo = lfilter(b, a, data, zi=zi*data[0])
@@ -313,6 +319,12 @@ class Filter():
     def irr_bandpass_filter_zi(self, data, irr_pars):
     
         b, a = self.irr_filter_discrete(*irr_pars)
+        if irr_pars[0] == "low":
+            self.PB_pars["tf"] = b,a
+        elif irr_pars[0] == "high":
+            self.PA_pars["tf"] = b,a
+        else: 
+            pass
         print(b, "/", a)
         zi = lfilter_zi(b, a)
         y,zo = lfilter(b, a, data, zi=zi*data[0])
@@ -321,6 +333,7 @@ class Filter():
     def irr_filter_discrete(self, btype, order, ftype, fc, rp, rs):
         b, a = signal.iirfilter(order, fc,rp = rp, rs=rs,
                         btype=btype, analog=False, ftype=ftype, fs=self.fs)
+        
         w, h = signal.freqz(b, a, fs= self.fs, worN= 40000)
         return b, a
     
@@ -354,16 +367,21 @@ class MainApp(QtWidgets.QMainWindow):
         #Plotters 
         self.canvas1 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
         self.canvas2 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
+        #toolbar = NavigationToolbar(self.canvas1, self)
+        #toolbar2 = NavigationToolbar(self.canvas2, self)
+        #layout = QtWidgets.QVBoxLayout()
+        #layout.addWidget(toolbar)
+        
         self.track_channel = [self.canvas1, self.canvas2]
         self.ui.gridLayout_3.addWidget(self.canvas1, 0, 1, 2, 1)
         self.ui.gridLayout.addWidget(self.canvas2, 0, 1, 2, 1)
 
+        
         #buffer
         self.q = queue.Queue()
-        
         #Armazenamento
         self.registrador = Registrador(self.samp_rate)
-
+        
         #Filtragem 
         self.filtros = Filter(self.samp_rate)
 
@@ -385,8 +403,8 @@ class MainApp(QtWidgets.QMainWindow):
         self.timer.start()
         
         #Eventos de seleção do canal com o clique do mouse
-        self.canvas1.mouseReleaseEvent =  lambda x:self.select_ch1()
-        self.canvas2.mouseReleaseEvent =   lambda x:self.select_ch2()
+        self.canvas1.mousePressEvent =  lambda x:self.select_ch1()
+        self.canvas2.mousePressEvent =   lambda x:self.select_ch2()
 
         #conexão dos sinais de entrada
         self.sliderPB.sliderReleased.connect(lambda: self.set_flag("filter_now"))
@@ -423,20 +441,32 @@ class MainApp(QtWidgets.QMainWindow):
         print('Setup ok')
     
     def refresh_adv_pars(self):
+        map_dict = {"Butterworth":"butter", "Bessel":"bessel","Chebyshev I":"cheby1", "Chebyshev II":"cheby2","Elíptico":"ellip"}
         typefPA = self.ui.comboBox_tipoPA.currentText()
         typefPB = self.ui.comboBox_tipoPB.currentText()
-        self.filtros.PA_pars['ftype'] = typefPA
-        self.filtros.PB_pars['ftype'] = typefPB
-        self.set_flag("wait_now")
-        print(typefPA,typefPB)
-
+        orderPB = self.ui.ordem_PB.value()
+        orderPA = self.ui.ordem_PA.value()
+        rpPB = self.ui.slider_rp_PB.value()
+        rpPA = self.ui.slider_rp_PA.value()
+        rsPB = self.ui.slider_rs_PB.value()
+        rsPA = self.ui.slider_rs_PA.value()
+        
+        self.filtros.set_PA_pars(map_dict[typefPA],orderPA,rpPA,rsPA)
+        self.filtros.set_PA_pars(map_dict[typefPB],orderPB,rpPB,rsPB)
+        self.set_flag("filter_now")
+        '''
+        tf_filtros = self.filtros.get_w_h()
+        self.canvas2.plot_wh(tf_filtros[0])
+        self.canvas2.plot_wh(tf_filtros[1])
+        self.canvas2.plot_wh(tf_filtros[2])
+        '''
+        
     def hide_show_adv_menu(self):
         if self.ui.adv_pars_Buton.isChecked(): 
             self.ui.adv_pars_Box.show()
         else: 
             self.ui.adv_pars_Box.hide()
         
-
     def select_ch1(self):
         
         self.ui.ch1.setStyleSheet("QGroupBox"
@@ -525,7 +555,7 @@ class MainApp(QtWidgets.QMainWindow):
                    self.estate_key[self.current_state]()
            except Exception as e:
                print("Error: state swich",e)
-##########################################################
+###########Processos dos estados##################################
     def gravando(self):
        if self.call_rec_td: 
            self.recButton.setEnabled(False)
@@ -628,6 +658,7 @@ class MainApp(QtWidgets.QMainWindow):
         
     def exit(self):
         sys.exit(app.exec_())
+   
     def filtrar(self):
         try:
             fc_PB = self.sliderPB.value()
@@ -641,7 +672,7 @@ class MainApp(QtWidgets.QMainWindow):
             self.filtros.set_PNT_fc(fc_NT)
 
             sinal_f = self.filtros.filter_serie(sinal)
-            
+            print("lol")
             self.registrador.set_signal_f(sinal_f) 
 
             self.canvas2.plot_signal(sinal_f)####
