@@ -5,7 +5,10 @@
 #Conrado/Tarsis
 
 #bibliotecas essenciais 
+from PyQt5.QtGui import QMouseEvent
+from PyQt5.uic.properties import QtGui
 from matplotlib.backend_bases import Event, MouseEvent
+from matplotlib.backends.backend_qt5 import FigureCanvasQT
 import matplotlib.pyplot as plt
 import sys 
 import matplotlib 
@@ -15,7 +18,7 @@ from PyQt5.QtCore import QEvent, pyqtSlot
 from PyQt5 import QtCore, QtWidgets
 from PyQt5 import uic
 import queue 
-from tkinter import *
+from PyQt5 import  QtMultimedia   
 import scipy.signal as signal
 from scipy.signal import butter, lfilter, lfilter_zi, freqs
 
@@ -31,14 +34,28 @@ struct_state_machine = {"INICIO":[("setup_end","ESPERANDO")], "ESPERANDO":[("rec
 flags_status = {"setup_end":False, "rec_now":False, "rec_end":False, "filter_now":False, "save_now":False, "open_now":False, "clear_now":False, "play_now":False, "pause_now":False, "wait_now":False}
 
 from scipy.fft import fft, fftfreq
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar 
 from matplotlib.figure import Figure
-class Ploter (FigureCanvas):
-    
-    def __init__(self,obj, samp_rate, parent=None, width=5, height=4, dpi=100 ):
+from matplotlib.widgets import SpanSelector
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar 
+from matplotlib.patches import Rectangle
+from matplotlib.collections import PatchCollection
+class BasePlotter(FigureCanvas):
+    def __init__(self, parent=None, width=5, height=4, dpi=100 ):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
-        super(Ploter, self).__init__(fig)
+        super(BasePlotter, self).__init__(fig)
+        toolbar = NavigationToolbar(self, self)
+        box_toolbar = QtWidgets.QVBoxLayout()
+        box_toolbar.addWidget(toolbar, 0)
+        box_toolbar.addWidget(toolbar, 0)
+        fig.tight_layout()
+        
+class Plotter (FigureCanvas):
+    
+    def __init__(self,event_select, obj=None, samp_rate=8000, parent=None, width=5, height=4, dpi=100 ):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = fig.add_subplot(111)
+        super(Plotter, self).__init__(fig)
         self.samp_rate = samp_rate
         self.samp_step = 1/self.samp_rate
         self.window_t = 2
@@ -49,7 +66,11 @@ class Ploter (FigureCanvas):
         self.x, self.y = self.init_plot_axis(self.window_t, self.samp_rate)
         self.axes.set_xlim(0, self.window_t)
         fig.tight_layout()
-        toolbar = NavigationToolbar(self, self)
+        
+        #self.span = SpanSelector(self.axes, self.onselect, 'horizontal', useblit=True,
+        #rectprops=dict(alpha=0.5, facecolor='red'),span_stays = True)
+        
+        
     def init_plot_axis(self, window_t, samp_rate):
         samp_step = 1/samp_rate
         window_s = window_t*samp_rate
@@ -87,11 +108,10 @@ class Ploter (FigureCanvas):
         self.draw()
 
     def plot_mark_time(self, current_time):
-        print("time: ", current_time)
         n = self.axes.axvline((current_time), color='green') 
         self.draw()
         plt.Axes.remove(n)
-
+        
     def fft_transf(self, y, N, T):
         yf = fft(y)
         xf = fftfreq(N, T)[:N//2]
@@ -109,14 +129,14 @@ class Ploter (FigureCanvas):
     def plot_wh(self,w_h):
         self.axes.semilogx(w_h[0] / (2*np.pi), 20 * np.log10(np.maximum(abs(w_h[1]), 1e-5)))
         self.draw()
-        
-
+    
     def clear_plot(self): 
         self.axes.clear()
         self.draw()
-        
-from tkinter import Scrollbar, filedialog
-from tkinter.filedialog import asksaveasfilename      
+       
+
+from tkinter import filedialog
+from tkinter.filedialog import asksaveasfilename, dialogstates      
 import soundfile as sf
 class Registrador(): 
     def __init__(self, samp_rate):
@@ -124,18 +144,25 @@ class Registrador():
         self.audio_memorized = []
         self.audio_f_memorized = []
         self.audio_to_play = []
+        self.audio_frag_selected = []
         self.samp_rate = samp_rate
-        self.time_player = 0
+        self.time_player_fs = (0,0)
     
     def set_signal_to_play(self, s):
         if s == 2:
             self.audio_to_play = self.get_signal_filt_not_norm()
         else: 
             self.audio_to_play = self.audio_memorized
-
-    def get_signal_to_play(self):
+            
+        self.set_time_player(0,len(self.audio_to_play))
+        print(self.time_player_fs)
+            
+    def get_signal_to_play(self, norm = False):
         try:
-            s = np.array(self.audio_to_play)
+            if norm:
+                s = np.array(self.audio_to_play)/32768
+            else:
+                s = np.array(self.audio_to_play)
             return s
         except: 
             print("nenhum sinal selecionado para enviar ao player")
@@ -159,8 +186,18 @@ class Registrador():
         return audio_array
 
     def get_time_player(self): 
-        return self.time_player
+        return self.time_player_fs
+    
 
+    def make_signal_frag(self, xmin, xmax):
+        #signal_selected = self.get_signal_to_play()
+        #self.audio_frag_selected = signal_selected[int(xmin*8000): int(xmax*8000)]
+        #self.audio_to_play = self.audio_frag_selected
+        print("sinal cortado em: ", xmin, xmax)
+        self.set_time_player(xmin, xmax)
+        #return self.get_signal_to_play()/32768
+        
+    
     def set_filters_memorized(self,a_b, filter=""):
         self.filters_memorized[filter] = a_b
         print(self.filters_memorized)
@@ -171,25 +208,20 @@ class Registrador():
     def extend_signal(self, data):
         self.audio_memorized.extend(data)
 
-    def set_time_player(self, time): 
-        self.time_player = time/self.samp_rate
+    def set_time_player(self, tini, tend): 
+        self.time_player_fs = tini, tend
 
     def save_wav(self): 
         try:
-            root = Tk()
-            root.withdraw()
             self.filename = asksaveasfilename(initialdir="/", title="Save as",
                 filetypes=(("audio file", "*.wav"), ("all files", "*.*")),
                 defaultextension=".wav")
             #save stream as .wav file
             sf.write(self.filename, self.audio_memorized, self.samp_rate, 'PCM_24') 
-            root.destroy()
         except:
             print("nenhum sinal de audio armazenado no sistema")
             
     def load_wav(self): 
-        root = Tk()
-        root.withdraw()
         _audio_file = filedialog.askopenfilename(initialdir="desktop/", title="Escolha um Arquivo", filetypes=(("wav files", "*.wav"),("all files", "*.*")))
         #self.audio_memorized = sf.read('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24')       
         filename = _audio_file
@@ -199,7 +231,7 @@ class Registrador():
         #self.time = np.arange (0, self.duration , 1/self.fs)
     
         self.audio_memorized = np.array(self.data)     
-        root.destroy()
+    
     def clear_memory(self): #Não testado
         self.audio_memorized = [] 
 
@@ -344,51 +376,53 @@ class MainApp(QtWidgets.QMainWindow):
                             "CARREGANDO":self.carregando, "CLEARING":self.clearing, "REPRODUZINDO":self.reproduzindo,
                             "ESPERANDO":self.esperando}
       
-        #Estado 0
+    #Estado 0
         self.current_state = "INICIO"
 
-        #init GUI
+    #init GUI
         QtWidgets.QMainWindow.__init__(self)
         self.resize(1024, 600)
         self.ui = uic.loadUi('main.ui', self)
 
-        #plot props
+    #plot props
         self.samp_rate = 8000
         self.interval = 30
 
-        #init manipulador de threads
+    #init manipulador de threads
         self.threadpool = QtCore.QThreadPool()	
         self.threadpool.setMaxThreadCount(1)
 
-        #Flags de controle das Threads
+    #Flags de controle das Threads
         self.call_rec_td = False
         self.call_play_td = False
 
-        #Plotters 
-        self.canvas1 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
-        self.canvas2 = Ploter(self, self.samp_rate, width=5, height=4, dpi=100)
-        #toolbar = NavigationToolbar(self.canvas1, self)
-        #toolbar2 = NavigationToolbar(self.canvas2, self)
-        #layout = QtWidgets.QVBoxLayout()
-        #layout.addWidget(toolbar)
+    #Plotters 
+    
+        self.canvas1 = Plotter(self, self.samp_rate, width=5, height=4, dpi=100)
+        self.canvas2 = Plotter(self, self.samp_rate, width=5, height=4, dpi=100)
         
+        self.span_ch1 = SpanSelector(self.canvas1.axes, self.onselect, 'horizontal', useblit=True,
+                        rectprops=dict(alpha=0.5, facecolor='red'),span_stays = True)
+        self.span_ch2 = SpanSelector(self.canvas2.axes, self.onselect, 'horizontal', useblit=True,
+                        rectprops=dict(alpha=0.5, facecolor='red'),span_stays = True)
         self.track_channel = [self.canvas1, self.canvas2]
         self.ui.gridLayout_3.addWidget(self.canvas1, 0, 1, 2, 1)
         self.ui.gridLayout.addWidget(self.canvas2, 0, 1, 2, 1)
-
+    
         
-        #buffer
+    #buffer
         self.q = queue.Queue()
-        #Armazenamento
-        self.registrador = Registrador(self.samp_rate)
         
-        #Filtragem 
+    #Armazenamento
+        self.registrador = Registrador(self.samp_rate)
+
+    #Filtragem 
         self.filtros = Filter(self.samp_rate)
 
-        #Audio I/O
+    #Audio I/O
         self.player = Player()
         
-        #init sliders
+    #init sliders
         val_pb = self.sliderPB.value()
         self.lab_PB.setText(str(val_pb))
         val_pa = self.sliderPB.value()
@@ -396,21 +430,22 @@ class MainApp(QtWidgets.QMainWindow):
         val_nt = self.sliderPB.value()
         self.lab_NT.setText(str(val_nt))
 
-        #timer for update SVM
+    #timer for update SVM
         self.timer = QtCore.QTimer()
         self.timer.setInterval(self.interval)
         self.timer.timeout.connect(self.update_system)
         self.timer.start()
-        
-        #Eventos de seleção do canal com o clique do mouse
-        self.canvas1.mousePressEvent =  lambda x:self.select_ch1()
-        self.canvas2.mousePressEvent =   lambda x:self.select_ch2()
-
-        #conexão dos sinais de entrada
+    
+    #Eventos de seleção do canal com o clique do mouse
+        #self.canvas1.mousePressEvent(None)
+        self.canvas1.mousePressEvent =  lambda x:self.select_ch_n(1, self.selected_ch1)
+        self.canvas2.mousePressEvent =   lambda x:self.select_ch_n(2, self.selected_ch2)
+     #conexão dos sinais de entrada
         self.sliderPB.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         self.sliderPA.sliderReleased.connect(lambda: self.set_flag("filter_now"))
         self.sliderNT.sliderReleased.connect(lambda: self.set_flag("filter_now"))
-        # Botões
+        
+    # Botões
         self.actionOriginal_Sound.triggered.connect(lambda: self.set_flag("save_now"))
         self.actionOpen.triggered.connect(lambda: self.set_flag("open_now"))
 
@@ -419,13 +454,13 @@ class MainApp(QtWidgets.QMainWindow):
         self.stopButton.clicked.connect(lambda: self.set_flag("wait_now"))
         self.pauseButton.clicked.connect(lambda: self.set_flag("pause_now"))
         self.clearButton.clicked.connect(lambda: self.set_flag("clear_now"))
-        
+       
         self.exitButton.clicked.connect(lambda: self.exit())
         self.freqtime_toggButon.clicked.connect(lambda: self.switch_freq_time())
         self.refreshButton.clicked.connect(lambda: self.refresh_adv_pars())
         self.adv_pars_Buton.clicked.connect(lambda: self.hide_show_adv_menu())
 
-        # Desativa/Ativa botões 
+    # Desativa/Ativa botões 
         self.recButton.setEnabled(True)
         self.playButton.setEnabled(False)
         self.stopButton.setEnabled(False)
@@ -437,9 +472,11 @@ class MainApp(QtWidgets.QMainWindow):
         #setup inicial: canal 1 selecionado
         self.worker = None
         self.ch_selected = 1
+    #End Setup
         self.set_flag("setup_end") 
         print('Setup ok')
-    
+
+
     def refresh_adv_pars(self):
         map_dict = {"Butterworth":"butter", "Bessel":"bessel","Chebyshev I":"cheby1", "Chebyshev II":"cheby2","Elíptico":"ellip"}
         typefPA = self.ui.comboBox_tipoPA.currentText()
@@ -453,7 +490,7 @@ class MainApp(QtWidgets.QMainWindow):
         
         self.filtros.set_PA_pars(map_dict[typefPA],orderPA,rpPA,rsPA)
         self.filtros.set_PA_pars(map_dict[typefPB],orderPB,rpPB,rsPB)
-        self.set_flag("filter_now")
+    
         '''
         tf_filtros = self.filtros.get_w_h()
         self.canvas2.plot_wh(tf_filtros[0])
@@ -466,9 +503,16 @@ class MainApp(QtWidgets.QMainWindow):
             self.ui.adv_pars_Box.show()
         else: 
             self.ui.adv_pars_Box.hide()
+     
+    def select_ch_n(self, ch_n, selected_ch_n):
+        self.ch_selected = ch_n
+        print("canal ", ch_n, " selecionado.") 
+        self.select_track_channel(self.ch_selected)
+        selected_ch_n()
+       
         
-    def select_ch1(self):
         
+    def selected_ch1(self):
         self.ui.ch1.setStyleSheet("QGroupBox"
                                      "{"
                                      "border : 2px solid black;"
@@ -487,10 +531,9 @@ class MainApp(QtWidgets.QMainWindow):
                                      "border : 0px solid;"
                                      "border-color : red green blue yellow"
                                      "}")
-        self.ch_selected = 1
-        print("canal 1 selecionado")   
+  
     
-    def select_ch2(self): 
+    def selected_ch2(self): 
         self.ui.ch2.setStyleSheet("QGroupBox"
                                      "{"
                                      "border : 2px solid black;"
@@ -509,8 +552,7 @@ class MainApp(QtWidgets.QMainWindow):
                                      "border : 0px solid;"
                                      "border-color : red green blue yellow"
                                      "}")
-        self.ch_selected = 2
-        print("canal 2 selecionado")   
+  
 
     #Altera a lista de flgs de entrada da maquina de estado       
     def set_flag(self, flag):
@@ -555,7 +597,7 @@ class MainApp(QtWidgets.QMainWindow):
                    self.estate_key[self.current_state]()
            except Exception as e:
                print("Error: state swich",e)
-###########Processos dos estados##################################
+##########################################################
     def gravando(self):
        if self.call_rec_td: 
            self.recButton.setEnabled(False)
@@ -612,7 +654,7 @@ class MainApp(QtWidgets.QMainWindow):
 ##########################################################
     def start_rec_play(self):
         QtWidgets.QApplication.processEvents()
-        end_time = 10*8000
+        end_time = 1000*8000
         current_time = 0
         self.player.open_stream()
         while self.current_state == "GRAVANDO":
@@ -633,20 +675,20 @@ class MainApp(QtWidgets.QMainWindow):
     
     def start_play(self): 
          QtWidgets.QApplication.processEvents()
-         self.select_track_channel(self.ch_selected)
          data = self.registrador.get_signal_to_play()
-         end_time = len(data) ##
-         current_time = 0
-         
+         tini,tend = self.registrador.get_time_player()
+         end_time = tend ##
+         current_time = tini
+         data = data[tini:tend]
          self.player.open_stream()
-         print("end time:", end_time)
          while(self.current_state == "REPRODUZINDO"):
+             print(end_time, current_time)
              QtWidgets.QApplication.processEvents()
-             current_time = self.player.play_frame(data)
+             l = self.player.play_frame(data)
              data = data[1000:]
              current_time = current_time + 1000
              self.track_channel[self.ch_selected - 1].plot_mark_time(current_time/8000)
-             if current_time == end_time:
+             if current_time >= end_time:
                  self.set_flag("wait_now")
                  break
          self.player.stop()
@@ -655,6 +697,7 @@ class MainApp(QtWidgets.QMainWindow):
     def clear_all(self): 
         self.track_channel[self.ch_selected - 1].clear_plot()
         self.registrador.clear_memory()
+        self.set_flag("wait_now")
         
     def exit(self):
         sys.exit(app.exec_())
@@ -703,16 +746,6 @@ class MainApp(QtWidgets.QMainWindow):
         except Exception as e: 
             print(e)
     
-    #não usadas por enquanto
-    def end_play(self, i):
-        self.recButton.setEnabled(True)
-        self.playButton.setEnabled(True)
-        self.stopButton.setEnabled(False)
-        self.pauseButton.setEnabled(False)
-        self.clearButton.setEnabled(True)
-        self.groupBox_2.setChecked(True)
-        self.registrador.set_time_player(i)
-
     def salvar(self): 
         self.registrador.save_wav()
         self.set_flag("wait_now")
@@ -745,12 +778,40 @@ class MainApp(QtWidgets.QMainWindow):
     def select_track_channel(self, ch): 
         self.registrador.set_signal_to_play(ch)
 
-    def open_adv_pars(self):
+    def open_new_window(self, singnal_frag):
+        print("abrindo janela...")
+        
+        self.dialog = WindowDIalog(singnal_frag)
+        #self.dialogs.append(dialog)
+        self.dialog.show()
+    def close_last_window(self):
+            pass
+    def onselect(self, xmin, xmax):
+        print(xmin*8000, xmax*8000)
+        
+        self.track_channel[self.ch_selected-1].plot_rectangle(xmin, xmax)
+        self.registrador.make_signal_frag(int(8000*xmin), int(8000*xmax))
+        singnal_frag = self.registrador.get_signal_to_play(norm=True)
+        self.open_new_window(singnal_frag[int(8000*xmin):int(8000*xmax)])
+        '''
+        line2.set_data(thisx, thisy)
+        ax2.set_xlim(thisx[0], thisx[-1])
+        ax2.set_ylim(thisy.min(), thisy.max())
+        fig.canvas.draw_idle()
+        '''
 
-        dlg = uic.loadUi('form.ui', self)
-      #  dlg.setWindowTitle("HELLO!")
-        dlg.show()
+    
 
+    
+class WindowDIalog(QtWidgets.QMainWindow):
+    def __init__(self, singnal_frag, parent=None):
+        super(WindowDIalog, self).__init__(parent)
+        self.ui_ = uic.loadUi('form.ui', self)
+        self.canvas_base = BasePlotter(self, width=50, height=40, dpi=100)
+        self.ui_.verticalLayout.addWidget(self.canvas_base, 1)
+        self.canvas_base.axes.plot(singnal_frag)
+        self.canvas_base.draw
+        
 class AdvancedOptions():
     def __init__(self):
         self.PA_pars = {"btype":"high", "order":5, "ftype":"ellip", "fc":100, "rp":1, "rs": 10 }
