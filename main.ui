@@ -39,50 +39,46 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_6">
-    <item row="2" column="0">
-     <widget class="QGroupBox" name="ch1">
-      <property name="autoFillBackground">
-       <bool>false</bool>
+    <item row="1" column="0">
+     <widget class="QGroupBox" name="groupBox">
+      <property name="styleSheet">
+       <string notr="true">
+background-color: rgb(255, 255, 255);</string>
       </property>
-      <layout class="QGridLayout" name="gridLayout_3">
-       <item row="2" column="1">
-        <spacer name="horizontalSpacer_2">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+      <property name="title">
+       <string>GroupBox</string>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="2">
+        <widget class="QPushButton" name="stopButton">
+         <property name="text">
+          <string>STOP</string>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>728</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
+        </widget>
        </item>
-       <item row="1" column="2">
-        <spacer name="verticalSpacer_3">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
+       <item row="0" column="0">
+        <widget class="QPushButton" name="recButton">
+         <property name="enabled">
+          <bool>true</bool>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
+         <property name="text">
+          <string>REC</string>
          </property>
-        </spacer>
+        </widget>
        </item>
-       <item row="0" column="0" rowspan="2">
-        <spacer name="verticalSpacer_4">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
+       <item row="0" column="3">
+        <widget class="QPushButton" name="pauseButton">
+         <property name="text">
+          <string>PAUSE</string>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QPushButton" name="playButton">
+         <property name="text">
+          <string>PLAY</string>
          </property>
-        </spacer>
+        </widget>
        </item>
       </layout>
      </widget>
@@ -501,6 +497,19 @@
          </property>
         </spacer>
        </item>
+       <item row="0" column="0" rowspan="2">
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
        <item row="1" column="3">
         <spacer name="verticalSpacer_2">
          <property name="orientation">
@@ -517,38 +526,13 @@
        <item row="0" column="2">
         <layout class="QVBoxLayout" name="verticalLayout_2"/>
        </item>
-       <item row="0" column="0" rowspan="2">
-        <spacer name="verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
        <item row="3" column="0" colspan="3">
-        <widget class="QFrame" name="">
+        <widget class="QFrame" name="frame">
          <layout class="QGridLayout" name="gridLayout_4">
-          <item row="2" column="1">
-           <widget class="QSlider" name="sliderPA">
-            <property name="minimum">
-             <number>1</number>
-            </property>
-            <property name="maximum">
-             <number>1000</number>
-            </property>
-            <property name="sliderPosition">
-             <number>100</number>
-            </property>
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="tickPosition">
-             <enum>QSlider::TicksAbove</enum>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>PB</string>
             </property>
            </widget>
           </item>
@@ -580,24 +564,10 @@
             </property>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_3">
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_4">
             <property name="text">
-             <string>PB</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="0">
-           <widget class="QLabel" name="label_5">
-            <property name="text">
-             <string>NT</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="2">
-           <widget class="QLabel" name="lab_PB">
-            <property name="text">
-             <string>TextLabel</string>
+             <string>PA</string>
             </property>
            </widget>
           </item>
@@ -623,10 +593,17 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="label_4">
+          <item row="5" column="0">
+           <widget class="QLabel" name="label_5">
             <property name="text">
-             <string>PA</string>
+             <string>NT</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="lab_PB">
+            <property name="text">
+             <string>TextLabel</string>
             </property>
            </widget>
           </item>
@@ -644,8 +621,82 @@
             </property>
            </widget>
           </item>
+          <item row="2" column="1">
+           <widget class="QSlider" name="sliderPA">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+            <property name="sliderPosition">
+             <number>100</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="tickPosition">
+             <enum>QSlider::TicksAbove</enum>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:14pt; font-weight:600;&quot;&gt;Electronic Stethoscope - CST em Eletrônica Industrial CTISM/UFSM&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QGroupBox" name="ch1">
+      <property name="autoFillBackground">
+       <bool>false</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_3">
+       <item row="2" column="1">
+        <spacer name="horizontalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>728</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="0" column="0" rowspan="2">
+        <spacer name="verticalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="1" column="2">
+        <spacer name="verticalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>
@@ -665,20 +716,24 @@
        <bool>true</bool>
       </property>
       <layout class="QGridLayout" name="gridLayout_5">
-       <item row="0" column="1">
-        <widget class="QPushButton" name="freqtime_toggButon">
-         <property name="text">
-          <string>Domínio da Frequência</string>
-         </property>
-         <property name="checkable">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
        <item row="0" column="2">
         <widget class="QPushButton" name="clearButton">
          <property name="text">
           <string>CLEAR</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="3">
+        <widget class="QPushButton" name="exitButton">
+         <property name="text">
+          <string>EXIT</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Ajuste de Banda:</string>
          </property>
         </widget>
        </item>
@@ -698,72 +753,17 @@
          </property>
         </widget>
        </item>
-       <item row="0" column="3">
-        <widget class="QPushButton" name="exitButton">
+       <item row="0" column="1">
+        <widget class="QPushButton" name="freqtime_toggButon">
          <property name="text">
-          <string>EXIT</string>
+          <string>Domínio da Frequência</string>
          </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="label_2">
-         <property name="text">
-          <string>Ajuste de Banda:</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="1" column="0">
-     <widget class="QGroupBox" name="groupBox">
-      <property name="styleSheet">
-       <string notr="true">
-background-color: rgb(255, 255, 255);</string>
-      </property>
-      <property name="title">
-       <string>GroupBox</string>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_2">
-       <item row="0" column="0">
-        <widget class="QPushButton" name="recButton">
-         <property name="enabled">
+         <property name="checkable">
           <bool>true</bool>
          </property>
-         <property name="text">
-          <string>REC</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="3">
-        <widget class="QPushButton" name="pauseButton">
-         <property name="text">
-          <string>PAUSE</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QPushButton" name="playButton">
-         <property name="text">
-          <string>PLAY</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="2">
-        <widget class="QPushButton" name="stopButton">
-         <property name="text">
-          <string>STOP</string>
-         </property>
         </widget>
        </item>
       </layout>
-     </widget>
-    </item>
-    <item row="0" column="0">
-     <widget class="QLabel" name="label">
-      <property name="text">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:14pt; font-weight:600;&quot;&gt;Electronic Stethoscope - CST em Eletrônica Industrial CTISM/UFSM&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
      </widget>
     </item>
    </layout>
@@ -897,6 +897,54 @@ background-color: rgb(255, 255, 255);</string>
     <hint type="destinationlabel">
      <x>1454</x>
      <y>393</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sliderPB</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lab_PB</receiver>
+   <slot>setNum(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>592</x>
+     <y>381</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1167</x>
+     <y>381</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sliderPA</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lab_PA</receiver>
+   <slot>setNum(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>592</x>
+     <y>423</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1167</x>
+     <y>423</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sliderNT</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lab_NT</receiver>
+   <slot>setNum(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>592</x>
+     <y>465</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1167</x>
+     <y>465</y>
     </hint>
    </hints>
   </connection>

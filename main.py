@@ -49,7 +49,8 @@ class BasePlotter(FigureCanvas):
         box_toolbar.addWidget(toolbar, 0)
         box_toolbar.addWidget(toolbar, 0)
         fig.tight_layout()
-        
+
+
 class Plotter (FigureCanvas):
     
     def __init__(self,event_select, obj=None, samp_rate=8000, parent=None, width=5, height=4, dpi=100 ):
@@ -60,7 +61,7 @@ class Plotter (FigureCanvas):
         self.samp_step = 1/self.samp_rate
         self.window_t = 2
         self.window = self.window_t/self.samp_step
-
+        self.cursor = self.axes.axvline((0), color='green')
         self.freq_dom = False
 
         self.x, self.y = self.init_plot_axis(self.window_t, self.samp_rate)
@@ -111,18 +112,23 @@ class Plotter (FigureCanvas):
         n = self.axes.axvline((current_time), color='green') 
         self.draw()
         plt.Axes.remove(n)
+    
+    def plot_cursor(self, current_time):
+        plt.Axes.remove(self.cursor)
+        self.cursor = self.axes.axvline((current_time), color='green') 
+        self.draw()
         
     def fft_transf(self, y, N, T):
         yf = fft(y)
         xf = fftfreq(N, T)[:N//2]
         return yf, xf
-
+        
     def plot_freq(self,data):
         self.clear_plot()
         N = len(data)
         yf_freq, xf_freq = self.fft_transf(data, N, self.samp_step )
-        self.axes.set_ylim( ymin=0, ymax=0.01)
-        self.axes.plot(xf_freq, 2.0/N * np.abs(yf_freq[0:N//2]))
+        #self.axes.set_ylim( ymin=0, ymax=0.01)
+        self.axes.plot(xf_freq, 1.0/N * np.abs(yf_freq[0:N//2]), color = (0,0,0))
         self.axes.grid()
         self.draw()
     
@@ -134,8 +140,8 @@ class Plotter (FigureCanvas):
         self.axes.clear()
         self.draw()
        
-
-from tkinter import filedialog
+from tkinter import *
+from tkinter import Scrollbar, filedialog
 from tkinter.filedialog import asksaveasfilename, dialogstates      
 import soundfile as sf
 class Registrador(): 
@@ -213,15 +219,20 @@ class Registrador():
 
     def save_wav(self): 
         try:
+            root = Tk()
+            root.withdraw()
             self.filename = asksaveasfilename(initialdir="/", title="Save as",
                 filetypes=(("audio file", "*.wav"), ("all files", "*.*")),
                 defaultextension=".wav")
             #save stream as .wav file
             sf.write(self.filename, self.audio_memorized, self.samp_rate, 'PCM_24') 
+            root.destroy()
         except:
             print("nenhum sinal de audio armazenado no sistema")
             
     def load_wav(self): 
+        root = Tk()
+        root.withdraw()
         _audio_file = filedialog.askopenfilename(initialdir="desktop/", title="Escolha um Arquivo", filetypes=(("wav files", "*.wav"),("all files", "*.*")))
         #self.audio_memorized = sf.read('audio_file.wav', self.audio_memorized, self.samp_rate, 'PCM_24')       
         filename = _audio_file
@@ -231,6 +242,7 @@ class Registrador():
         #self.time = np.arange (0, self.duration , 1/self.fs)
     
         self.audio_memorized = np.array(self.data)     
+        root.destroy()    
     
     def clear_memory(self): #Não testado
         self.audio_memorized = [] 
@@ -508,6 +520,8 @@ class MainApp(QtWidgets.QMainWindow):
         self.ch_selected = ch_n
         print("canal ", ch_n, " selecionado.") 
         self.select_track_channel(self.ch_selected)
+        
+        
         selected_ch_n()
        
         
@@ -515,7 +529,7 @@ class MainApp(QtWidgets.QMainWindow):
     def selected_ch1(self):
         self.ui.ch1.setStyleSheet("QGroupBox"
                                      "{"
-                                     "border : 2px solid black;"
+                                     "border : 4px solid black;"
                                      "}"
                                      "QGroupBox::editable:on"
                                      "{"
@@ -536,7 +550,7 @@ class MainApp(QtWidgets.QMainWindow):
     def selected_ch2(self): 
         self.ui.ch2.setStyleSheet("QGroupBox"
                                      "{"
-                                     "border : 2px solid black;"
+                                     "border : 4px solid black;"
                                      "}"
                                      "QGroupBox::editable:on"
                                      "{"
@@ -654,7 +668,7 @@ class MainApp(QtWidgets.QMainWindow):
 ##########################################################
     def start_rec_play(self):
         QtWidgets.QApplication.processEvents()
-        end_time = 1000*8000
+        end_time = 100000*8000
         current_time = 0
         self.player.open_stream()
         while self.current_state == "GRAVANDO":
@@ -754,6 +768,7 @@ class MainApp(QtWidgets.QMainWindow):
         self.actionOpen.setEnabled(False)
         self.registrador.load_wav()
         self.canvas1.plot_signal(self.registrador.get_signal_norm())
+        self.select_ch_n(1, self.selected_ch1)
         self.set_flag("wait_now")
     #alterna o domínio dos graficos dos canais (tempo/frequencia) 
     def switch_freq_time(self):
@@ -788,8 +803,8 @@ class MainApp(QtWidgets.QMainWindow):
             pass
     def onselect(self, xmin, xmax):
         print(xmin*8000, xmax*8000)
+        self.track_channel[self.ch_selected-1].plot_cursor(xmin)
         
-        self.track_channel[self.ch_selected-1].plot_rectangle(xmin, xmax)
         self.registrador.make_signal_frag(int(8000*xmin), int(8000*xmax))
         singnal_frag = self.registrador.get_signal_to_play(norm=True)
         self.open_new_window(singnal_frag[int(8000*xmin):int(8000*xmax)])
@@ -827,10 +842,10 @@ class Worker(QtCore.QRunnable):
 	def run(self):
 
 		self.function(*self.args, **self.kwargs)
-
-app = QtWidgets.QApplication(sys.argv)
-MainWindow  = MainApp()
-MainWindow.show()
-sys.exit(app.exec_())
+if __name__ == '__main__':
+    app = QtWidgets.QApplication(sys.argv)
+    MainWindow  = MainApp()
+    MainWindow.show()
+    sys.exit(app.exec_())
 
 

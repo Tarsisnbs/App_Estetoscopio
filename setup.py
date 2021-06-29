@@ -10,7 +10,7 @@ if sys.platform == 'win32':
 executables = [Executable("main.py", base=base)]
 
 packages = ["idna"]
-options={"build_exe": {"include_files": "Gui.py"}}
+options={"build_exe": {"include_files": "main.ui"}}
 executables=executables,
 
 
@@ -18,7 +18,7 @@ setup(
 name="mytest",
 version="0.1",
 description="",
-options={"build_exe": {"include_files": "Gui.py"}},
+options={"build_exe": {"include_files": "main.ui"}},
 executables=[Executable("main.py")],
 )
 
