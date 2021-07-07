@@ -6,7 +6,11 @@
    <rect>
     <x>0</x>
     <y>0</y>
+<<<<<<< HEAD
     <width>1046</width>
+=======
+    <width>1527</width>
+>>>>>>> newVers
     <height>690</height>
    </rect>
   </property>
@@ -49,6 +53,13 @@ background-color: rgb(255, 255, 255);</string>
        <string>GroupBox</string>
       </property>
       <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="2">
+        <widget class="QPushButton" name="stopButton">
+         <property name="text">
+          <string>STOP</string>
+         </property>
+        </widget>
+       </item>
        <item row="0" column="0">
         <widget class="QPushButton" name="recButton">
          <property name="enabled">
@@ -73,6 +84,7 @@ background-color: rgb(255, 255, 255);</string>
          </property>
         </widget>
        </item>
+<<<<<<< HEAD
        <item row="0" column="2">
         <widget class="QPushButton" name="stopButton">
          <property name="text">
@@ -84,12 +96,410 @@ background-color: rgb(255, 255, 255);</string>
         <widget class="QPushButton" name="clearButton">
          <property name="text">
           <string>CLEAR ALL</string>
+=======
+      </layout>
+     </widget>
+    </item>
+    <item row="1" column="1" rowspan="4">
+     <widget class="QGroupBox" name="adv_pars_Box">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="title">
+       <string>Parâmetros Avançados</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QGroupBox" name="groupBoxPB">
+         <property name="title">
+          <string>Filtro Passa Baixas</string>
+         </property>
+         <widget class="QSlider" name="slider_rp_PB">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>91</y>
+            <width>42</width>
+            <height>18</height>
+           </rect>
+          </property>
+          <property name="value">
+           <number>3</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+         <widget class="QSlider" name="slider_rs_PB">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>120</y>
+            <width>42</width>
+            <height>18</height>
+           </rect>
+          </property>
+          <property name="sliderPosition">
+           <number>40</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_15">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>118</y>
+            <width>41</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>RS[db]</string>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_12">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>31</y>
+            <width>25</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>Tipo</string>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_14">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>89</y>
+            <width>41</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>RP[db]</string>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_11">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>60</y>
+            <width>39</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>Ordem</string>
+          </property>
+         </widget>
+         <widget class="QSpinBox" name="ordem_PB">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>60</y>
+            <width>42</width>
+            <height>22</height>
+           </rect>
+          </property>
+          <property name="value">
+           <number>4</number>
+          </property>
+         </widget>
+         <widget class="QLCDNumber" name="lcd_rp_PB">
+          <property name="geometry">
+           <rect>
+            <x>106</x>
+            <y>89</y>
+            <width>64</width>
+            <height>22</height>
+           </rect>
+          </property>
+          <property name="intValue" stdset="0">
+           <number>3</number>
+          </property>
+         </widget>
+         <widget class="QLCDNumber" name="lcd_rs_PB">
+          <property name="geometry">
+           <rect>
+            <x>106</x>
+            <y>118</y>
+            <width>64</width>
+            <height>22</height>
+           </rect>
+          </property>
+          <property name="smallDecimalPoint">
+           <bool>false</bool>
+          </property>
+          <property name="intValue" stdset="0">
+           <number>40</number>
+          </property>
+         </widget>
+         <widget class="QComboBox" name="comboBox_tipoPB">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>31</y>
+            <width>113</width>
+            <height>22</height>
+           </rect>
+          </property>
+          <item>
+           <property name="text">
+            <string>Butterworth</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Bessel</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Chebyshev I</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Chebyshev II</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Elíptico</string>
+           </property>
+          </item>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBoxPA">
+         <property name="title">
+          <string>Filtro Passa Altas</string>
+         </property>
+         <widget class="QLabel" name="label_20">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>125</y>
+            <width>41</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>RS[db]</string>
+          </property>
+         </widget>
+         <widget class="QSlider" name="slider_rp_PA">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>97</y>
+            <width>42</width>
+            <height>18</height>
+           </rect>
+          </property>
+          <property name="sliderPosition">
+           <number>3</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+         <widget class="QSlider" name="slider_rs_PA">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>127</y>
+            <width>42</width>
+            <height>18</height>
+           </rect>
+          </property>
+          <property name="sliderPosition">
+           <number>40</number>
+          </property>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_21">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>31</y>
+            <width>25</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>Tipo</string>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_22">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>95</y>
+            <width>41</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>RP[db]</string>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_23">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>62</y>
+            <width>39</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>Ordem</string>
+          </property>
+         </widget>
+         <widget class="QSpinBox" name="ordem_PA">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>62</y>
+            <width>42</width>
+            <height>26</height>
+           </rect>
+          </property>
+          <property name="value">
+           <number>4</number>
+          </property>
+         </widget>
+         <widget class="QLCDNumber" name="lcd_rp_PA">
+          <property name="geometry">
+           <rect>
+            <x>106</x>
+            <y>95</y>
+            <width>64</width>
+            <height>23</height>
+           </rect>
+          </property>
+          <property name="intValue" stdset="0">
+           <number>3</number>
+          </property>
+         </widget>
+         <widget class="QLCDNumber" name="lcd_rs_PA">
+          <property name="geometry">
+           <rect>
+            <x>106</x>
+            <y>125</y>
+            <width>64</width>
+            <height>23</height>
+           </rect>
+          </property>
+          <property name="intValue" stdset="0">
+           <number>40</number>
+          </property>
+         </widget>
+         <widget class="QComboBox" name="comboBox_tipoPA">
+          <property name="geometry">
+           <rect>
+            <x>57</x>
+            <y>31</y>
+            <width>105</width>
+            <height>24</height>
+           </rect>
+          </property>
+          <item>
+           <property name="text">
+            <string>Butterworth</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Bessel</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Chebyshev I</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Chebyshev II</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Elíptico</string>
+           </property>
+          </item>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="groupBoxNT">
+         <property name="title">
+          <string>Filtro Notch</string>
+         </property>
+         <widget class="QLabel" name="label_16">
+          <property name="geometry">
+           <rect>
+            <x>11</x>
+            <y>31</y>
+            <width>33</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="text">
+           <string>      Q</string>
+          </property>
+         </widget>
+         <widget class="QSpinBox" name="q_NT">
+          <property name="geometry">
+           <rect>
+            <x>68</x>
+            <y>31</y>
+            <width>42</width>
+            <height>26</height>
+           </rect>
+          </property>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pushButton">
+         <property name="text">
+          <string>DEFAUT PARS</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="refreshButton">
+         <property name="text">
+          <string>REFRESH</string>
+>>>>>>> newVers
          </property>
         </widget>
        </item>
       </layout>
      </widget>
     </item>
+<<<<<<< HEAD
     <item row="2" column="0">
      <layout class="QGridLayout" name="gridLayout_3">
       <item row="1" column="2">
@@ -131,11 +541,170 @@ background-color: rgb(255, 255, 255);</string>
            <width>767</width>
            <height>143</height>
           </rect>
+=======
+    <item row="3" column="0">
+     <widget class="QGroupBox" name="ch2">
+      <layout class="QGridLayout" name="gridLayout">
+       <item row="2" column="1">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+>>>>>>> newVers
          </property>
-         <property name="styleSheet">
-          <string notr="true">background-color: rgb(0, 0, 0);</string>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>728</width>
+           <height>20</height>
+          </size>
          </property>
+        </spacer>
+       </item>
+       <item row="0" column="0" rowspan="2">
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="1" column="3">
+        <spacer name="verticalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="0" column="2">
+        <layout class="QVBoxLayout" name="verticalLayout_2"/>
+       </item>
+       <item row="3" column="0" colspan="3">
+        <widget class="QFrame" name="frame">
+         <layout class="QGridLayout" name="gridLayout_4">
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_3">
+            <property name="text">
+             <string>PB</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QSlider" name="sliderNT">
+            <property name="styleSheet">
+             <string notr="true">color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255));</string>
+            </property>
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>100</number>
+            </property>
+            <property name="sliderPosition">
+             <number>60</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="invertedAppearance">
+             <bool>false</bool>
+            </property>
+            <property name="invertedControls">
+             <bool>false</bool>
+            </property>
+            <property name="tickPosition">
+             <enum>QSlider::TicksAbove</enum>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>PA</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSlider" name="sliderPB">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+            <property name="sliderPosition">
+             <number>100</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="tickPosition">
+             <enum>QSlider::TicksAbove</enum>
+            </property>
+            <property name="tickInterval">
+             <number>10</number>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="label_5">
+            <property name="text">
+             <string>NT</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="lab_PB">
+            <property name="text">
+             <string>TextLabel</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="2">
+           <widget class="QLabel" name="lab_NT">
+            <property name="text">
+             <string>TextLabel</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QLabel" name="lab_PA">
+            <property name="text">
+             <string>TextLabel</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSlider" name="sliderPA">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000</number>
+            </property>
+            <property name="sliderPosition">
+             <number>100</number>
+            </property>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="tickPosition">
+             <enum>QSlider::TicksAbove</enum>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
+<<<<<<< HEAD
        </widget>
       </item>
       <item row="2" column="1">
@@ -152,11 +721,17 @@ background-color: rgb(255, 255, 255);</string>
        </spacer>
       </item>
      </layout>
+=======
+       </item>
+      </layout>
+     </widget>
+>>>>>>> newVers
     </item>
     <item row="0" column="0">
      <widget class="QLabel" name="label">
       <property name="text">
        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:14pt; font-weight:600;&quot;&gt;Electronic Stethoscope - CST em Eletrônica Industrial CTISM/UFSM&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+<<<<<<< HEAD
       </property>
      </widget>
     </item>
@@ -214,14 +789,123 @@ background-color: rgb(255, 255, 255);</string>
            <width>767</width>
            <height>143</height>
           </rect>
+=======
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QGroupBox" name="ch1">
+      <property name="autoFillBackground">
+       <bool>false</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_3">
+       <item row="2" column="1">
+        <spacer name="horizontalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
-         <property name="styleSheet">
-          <string notr="true">background-color: rgb(0, 0, 0);</string>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>728</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="0" column="0" rowspan="2">
+        <spacer name="verticalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="1" column="2">
+        <spacer name="verticalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="4" column="0">
+     <widget class="QGroupBox" name="groupBox_2">
+      <property name="styleSheet">
+       <string notr="true"/>
+      </property>
+      <property name="title">
+       <string>GroupBox</string>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_5">
+       <item row="0" column="2">
+        <widget class="QPushButton" name="clearButton">
+         <property name="text">
+          <string>CLEAR</string>
          </property>
         </widget>
-       </widget>
-      </item>
-     </layout>
+       </item>
+       <item row="0" column="3">
+        <widget class="QPushButton" name="exitButton">
+         <property name="text">
+          <string>EXIT</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Ajuste de Banda:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QPushButton" name="adv_pars_Buton">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
+         <property name="autoFillBackground">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>PARÂMETROS AVANÇADOS</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QPushButton" name="freqtime_toggButon">
+         <property name="text">
+          <string>Domínio da Frequência</string>
+>>>>>>> newVers
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </item>
     <item row="3" column="0">
      <widget class="QGroupBox" name="groupBox_2">
@@ -395,14 +1079,25 @@ background-color: rgb(255, 255, 255);</string>
      </widget>
     </item>
    </layout>
+   <zorder>adv_pars_Box</zorder>
+   <zorder>groupBox</zorder>
+   <zorder>label</zorder>
+   <zorder>groupBox_2</zorder>
+   <zorder>ch1</zorder>
+   <zorder>ch2</zorder>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
+<<<<<<< HEAD
      <width>1046</width>
      <height>25</height>
+=======
+     <width>1527</width>
+     <height>37</height>
+>>>>>>> newVers
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -457,5 +1152,118 @@ background-color: rgb(255, 255, 255);</string>
   </action>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>slider_rp_PB</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lcd_rp_PB</receiver>
+   <slot>display(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1383</x>
+     <y>250</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1454</x>
+     <y>252</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>slider_rs_PB</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lcd_rs_PB</receiver>
+   <slot>display(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1383</x>
+     <y>279</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1454</x>
+     <y>281</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>slider_rs_PA</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lcd_rs_PA</receiver>
+   <slot>display(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1383</x>
+     <y>420</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1454</x>
+     <y>423</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>slider_rp_PA</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lcd_rp_PA</receiver>
+   <slot>display(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1383</x>
+     <y>390</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1454</x>
+     <y>393</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sliderPB</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lab_PB</receiver>
+   <slot>setNum(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>592</x>
+     <y>381</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1167</x>
+     <y>381</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sliderPA</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lab_PA</receiver>
+   <slot>setNum(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>592</x>
+     <y>423</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1167</x>
+     <y>423</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>sliderNT</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>lab_NT</receiver>
+   <slot>setNum(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>592</x>
+     <y>465</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>1167</x>
+     <y>465</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
