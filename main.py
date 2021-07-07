@@ -620,6 +620,8 @@ class MainApp(QtWidgets.QMainWindow):
            self.pauseButton.setEnabled(False)
            self.clearButton.setEnabled(False)
            self.groupBox_2.setChecked(False)
+           self.track_channel[self.ch_selected - 1].clear_plot()
+           self.registrador.clear_memory()
            self.start_worker() 
        else:
             pass   
@@ -765,7 +767,6 @@ class MainApp(QtWidgets.QMainWindow):
         self.set_flag("wait_now")
     
     def load_audio(self):
-        self.actionOpen.setEnabled(False)
         self.registrador.load_wav()
         self.canvas1.plot_signal(self.registrador.get_signal_norm())
         self.select_ch_n(1, self.selected_ch1)
@@ -845,7 +846,7 @@ class Worker(QtCore.QRunnable):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     MainWindow  = MainApp()
-    MainWindow.show()
+    MainWindow.showMaximized()
     sys.exit(app.exec_())
 
 
